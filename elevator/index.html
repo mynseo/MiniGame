@@ -5,95 +5,44 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>닫힘 버튼 연타 — 엘리베이터 문 빨리 닫기</title>
 <style>
-  :root {
-    --metal: #b9c0c7;
-    --metal-dark: #7d868f;
-    --panel: #2b2f35;
-    --accent: #ffcc33;
-    --bad: #ff5a5a;
-    --good: #4cd38a;
-  }
+  :root { --accent: #ffcc33; --bad: #ff5a5a; --good: #4cd38a; }
   * { box-sizing: border-box; }
   html, body {
-    margin: 0; height: 100%; overflow: hidden;
+    margin: 0; height: 100%; overflow: hidden; background: #0e0f13; color: #f2f2f2;
     font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    background: #1b1d21; color: #f2f2f2;
-    -webkit-user-select: none; user-select: none;
-    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
   #app { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
-
-  /* 위쪽 정보 줄 */
   #hud {
     flex: none; display: flex; justify-content: space-between; align-items: center;
     padding: 10px 16px; background: #111316; font-variant-numeric: tabular-nums; z-index: 5;
   }
-  #hud .floor { font-family: ui-monospace, monospace; color: var(--bad); font-size: 22px; letter-spacing: 2px; }
+  #hud .title { font-weight: 800; font-size: 15px; opacity: .8; }
   #hud .stat { font-size: 15px; opacity: .85; }
   #hud .stat b { font-size: 20px; color: var(--accent); }
+  #view { position: relative; flex: 1; min-height: 0; }
+  #view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
-  /* 엘리베이터 안에서 문을 바라보는 장면 */
-  #stage { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; gap: 4vmin; padding: 3vmin; }
-  #car {
-    position: relative; height: min(70vh, 120vw); aspect-ratio: 3 / 4;
-    background: linear-gradient(90deg, #8d959d, #c9cfd5 30%, #c9cfd5 70%, #8d959d);
-    border-radius: 6px; padding: 5% 7% 0; box-shadow: inset 0 0 40px rgba(0,0,0,.5);
-  }
-  #doorway {
-    position: relative; width: 100%; height: 100%; overflow: hidden;
-    background: linear-gradient(#e9e2d0 0 62%, #a88d6a 62% 100%); /* 복도 벽과 바닥 */
-    border: 4px solid #5d656d; border-bottom: none;
-  }
-  #hall-light { position: absolute; left: 20%; right: 20%; top: 4%; height: 3%; background: #fff8dc; border-radius: 4px; box-shadow: 0 0 30px #fff3b0; }
-  #person {
-    position: absolute; left: 50%; bottom: 8%;
-    font-size: 40px; line-height: 1; transform-origin: 50% 100%;
-    transform: translateX(-50%) scale(.35);
-  }
   #bubble {
-    position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); transform-origin: 50% 100%;
-    white-space: nowrap; background: #fff; color: #222; font-size: 12px; font-weight: 700;
-    padding: 3px 7px; border-radius: 8px; opacity: 0; transition: opacity .2s;
+    position: absolute; z-index: 3; transform: translate(-50%, -100%); pointer-events: none;
+    white-space: nowrap; background: #fff; color: #222; font-weight: 800; font-size: 15px;
+    padding: 5px 10px; border-radius: 10px; opacity: 0; transition: opacity .15s;
+  }
+  #bubble::after {
+    content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+    border: 7px solid transparent; border-top-color: #fff;
   }
   #bubble.show { opacity: 1; }
-  .door {
-    position: absolute; top: 0; bottom: 0; width: 50%;
-    background: linear-gradient(90deg, #9ba3ab, #d6dbe0 45%, #aab2ba);
-    transition: transform 90ms linear;
-    box-shadow: inset 0 0 12px rgba(0,0,0,.35);
-  }
-  .door.left { left: 0; border-right: 1px solid #6c737a; }
-  .door.right { right: 0; border-left: 1px solid #6c737a; }
-  #car.shake { animation: shake .25s; }
-  @keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 
-  /* 버튼 */
-  .panel {
-    background: var(--panel); border-radius: 10px; padding: 14px 12px;
-    display: grid; grid-template-columns: repeat(2, auto); gap: 10px; justify-items: center;
-    box-shadow: 0 4px 16px rgba(0,0,0,.5);
+  #countdown {
+    position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; pointer-events: none;
+    font-size: 22vmin; font-weight: 900; color: var(--accent); text-shadow: 0 6px 20px #000;
   }
-  .panel .floorbtn {
-    width: 44px; height: 44px; border-radius: 50%; border: 2px solid #555b63;
-    background: #3a3f46; color: #aaa; font-size: 15px; display: grid; place-items: center;
-  }
-  .ebtn {
-    width: 76px; height: 76px; border-radius: 50%; border: 3px solid #9aa1a8;
-    background: radial-gradient(circle at 40% 35%, #f4f6f8, #b8bfc6);
-    color: #333; font-size: 22px; font-weight: 800; letter-spacing: -3px; cursor: pointer;
-    display: grid; place-items: center; padding: 0; touch-action: manipulation;
-    transition: transform 50ms, box-shadow 50ms; box-shadow: 0 3px 0 #5f666d;
-  }
-  .ebtn small { display: block; font-size: 10px; letter-spacing: 0; font-weight: 600; margin-top: -4px; }
-  .ebtn.pressed { transform: translateY(2px) scale(.96); box-shadow: 0 0 12px var(--accent); border-color: var(--accent); }
-  .ebtn.open { color: #2c5ea8; }
-  .ebtn:disabled { opacity: .5; cursor: default; }
-  .floating { position: absolute; z-index: 4; }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; opacity: .7; }
 
-  /* 시작·결과 화면 */
   #overlay {
-    position: absolute; inset: 0; z-index: 10; background: rgba(10,12,15,.86);
+    position: absolute; inset: 0; z-index: 10; background: rgba(10,12,15,.82);
     display: flex; align-items: center; justify-content: center; padding: 20px;
   }
   #overlay.hidden { display: none; }
@@ -110,311 +59,705 @@
   .mode:hover { border-color: var(--accent); }
   .mode b { font-size: 18px; }
   .mode span { display: block; font-size: 13px; opacity: .75; margin-top: 4px; }
-  .mode .best { color: var(--accent); opacity: 1; }
+  .mode .best { display: inline; color: var(--accent); opacity: 1; }
   .row { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
   .btn { border: none; border-radius: 10px; padding: 12px 18px; font: inherit; font-weight: 700; cursor: pointer; }
   .btn.primary { background: var(--accent); color: #222; }
   .btn.ghost { background: #333941; color: #eee; }
-  #countdown { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; pointer-events: none; font-size: 22vmin; font-weight: 900; color: var(--accent); text-shadow: 0 6px 20px #000; }
   .big { font-size: 40px; font-weight: 900; color: var(--accent); font-variant-numeric: tabular-nums; }
   .newbest { color: var(--good); font-weight: 800; }
-
-  @media (max-aspect-ratio: 4/5) {
-    #stage { flex-direction: column; }
-    #car { height: auto; width: min(80vw, 46vh); }
-    .panel { grid-template-columns: repeat(4, auto); }
-  }
 </style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
 </head>
 <body>
 <div id="app">
   <div id="hud">
-    <div class="floor" id="floor">▼ 1F</div>
+    <div class="title">🛗 닫힘 버튼 연타</div>
     <div class="stat">시간 <b id="time">0.00</b>s</div>
     <div class="stat">닫힘 <b id="taps">0</b><span id="need"></span></div>
   </div>
-
-  <div id="stage">
-    <div id="car">
-      <div id="doorway">
-        <div id="hall-light"></div>
-        <div id="person"><div id="bubble">잠깐만요~!</div>🏃</div>
-        <div class="door left" id="doorL"></div>
-        <div class="door right" id="doorR"></div>
-      </div>
-    </div>
-    <div class="panel" id="panel">
-      <div class="floorbtn">5</div><div class="floorbtn">6</div>
-      <div class="floorbtn">3</div><div class="floorbtn">4</div>
-      <button class="ebtn open" id="openBtn" aria-label="열림">◀▶<small>열림</small></button>
-      <button class="ebtn" id="closeBtn" aria-label="닫힘">▶◀<small>닫힘</small></button>
-    </div>
+  <div id="view">
+    <div id="loading">불러오는 중…</div>
+    <div id="bubble"></div>
   </div>
-
   <div id="countdown"></div>
-  <div id="overlay"></div>
+  <div id="overlay" class="hidden"></div>
 </div>
 
-<script>
-(() => {
-  // 모드별 규칙: 닫힘을 몇 번 눌러야 문이 다 닫히는지, 상대가 문 앞까지 오는 데 걸리는 시간(초)
-  const MODES = {
-    fixed:  { name: '고정 버튼', taps: 30, arrive: 6.0, desc: '닫힘 버튼은 제자리. 손가락이 허락하는 한 최대한 빠르게 연타!' },
-    random: { name: '랜덤 버튼', taps: 15, arrive: 7.0, desc: '누를 때마다 닫힘 버튼이 다른 곳으로 도망갑니다. 같이 움직이는 열림 버튼은 누르면 문이 다시 열려요!' },
+<script type="module">
+import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ---------------------------------------------------------------- 규칙
+// 모드별: 닫힘을 몇 번 눌러야 문이 다 닫히는지, 상대가 문 앞까지 오는 데 걸리는 시간(초)
+const MODES = {
+  fixed:  { name: '고정 버튼', taps: 30, arrive: 6.0, desc: '닫힘 버튼은 제자리. 손가락이 허락하는 한 최대한 빠르게 연타!' },
+  random: { name: '랜덤 버튼', taps: 15, arrive: 7.5, desc: '누를 때마다 닫힘 버튼이 엘리베이터 안 어딘가로 순간이동. 같이 움직이는 열림 버튼은 누르면 문이 다시 열려요!' },
+};
+const OPEN_PENALTY = 3; // 열림 버튼을 잘못 누르면 되돌아가는 닫힘 횟수
+
+// ---------------------------------------------------------------- 치수 (m)
+// 엘리베이터 안: x -0.8~0.8, 바닥 y=0 ~ 천장 2.3, 앞벽 z=0 ~ 뒷벽 z=1.6. 복도는 -z 쪽
+const CAR_W = 1.6, CAR_H = 2.3, CAR_D = 1.6;
+const DOOR_W = 0.9, DOOR_H = 2.1;
+const HALL_LEN = 16, HALL_W = 2.4;
+const START_Z = -15, ARRIVE_Z = -0.45;
+const EYE = new THREE.Vector3(0.12, 1.6, 1.42);
+const LOOK = new THREE.Vector3(0.12, 1.3, 0);
+
+const $ = (id) => document.getElementById(id);
+const view = $('view'), bubble = $('bubble'), overlay = $('overlay'), countdown = $('countdown');
+const timeEl = $('time'), tapsEl = $('taps'), needEl = $('need');
+
+// ---------------------------------------------------------------- 렌더러·장면
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+view.appendChild(renderer.domElement);
+$('loading').remove();
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e0f13);
+// 스테인리스 벽이 비칠 주변 환경. 없으면 금속이 검게 보인다
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+pmrem.dispose();
+scene.fog = new THREE.Fog(0x1a1712, 9, 20);
+
+const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 40);
+camera.position.copy(EYE);
+camera.lookAt(LOOK);
+
+scene.add(new THREE.HemisphereLight(0xfff6e8, 0x2a2420, 0.7));
+const carLight = new THREE.PointLight(0xfff1dc, 5, 5, 1.6);
+carLight.position.set(0, 2.15, 0.8);
+scene.add(carLight);
+for (let z = -2; z > -HALL_LEN; z -= 4.5) {
+  const l = new THREE.PointLight(0xffe7b8, 6, 7, 1.6);
+  l.position.set(0, 2.45, z);
+  scene.add(l);
+}
+
+// ---------------------------------------------------------------- 재질·텍스처
+const mat = (color, roughness = 0.8, metalness = 0, extra = {}) =>
+  new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
+
+function canvasTexture(w, h, draw) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+// 세로 결이 있는 헤어라인 스테인리스
+const brushed = canvasTexture(256, 256, (g, w, h) => {
+  g.fillStyle = '#b9c1c9'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 900; i++) {
+    const v = 150 + Math.random() * 90 | 0;
+    g.fillStyle = `rgba(${v},${v + 6},${v + 12},.35)`;
+    g.fillRect(Math.random() * w, 0, 1, h);
+  }
+});
+brushed.wrapS = brushed.wrapT = THREE.RepeatWrapping;
+const steel = mat(0xffffff, 0.32, 0.85, { map: brushed });
+const steelDark = mat(0x8a9198, 0.4, 0.9);
+const doorSteel = mat(0xe6ebf0, 0.25, 0.9, { map: brushed });
+
+const tiles = canvasTexture(256, 256, (g, w, h) => {
+  g.fillStyle = '#cfc6b4'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#bdb3a0'; g.fillRect(0, 0, w / 2, h / 2); g.fillRect(w / 2, h / 2, w / 2, h / 2);
+  g.strokeStyle = '#a99f8c'; g.lineWidth = 3; g.strokeRect(0, 0, w, h); g.strokeRect(0, 0, w / 2, h / 2);
+});
+tiles.wrapS = tiles.wrapT = THREE.RepeatWrapping;
+tiles.repeat.set(HALL_W / 1.2, HALL_LEN / 1.2);
+
+const granite = canvasTexture(256, 256, (g, w, h) => {
+  g.fillStyle = '#3b3a40'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 2500; i++) {
+    const v = 40 + Math.random() * 60 | 0;
+    g.fillStyle = `rgb(${v},${v},${v + 6})`;
+    g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+  }
+});
+
+// ---------------------------------------------------------------- 엘리베이터 안
+function box(w, h, d, material, x, y, z, parent = scene) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
+}
+const T = 0.06; // 벽 두께
+box(CAR_W, 0.02, CAR_D, mat(0xffffff, 0.35, 0.1, { map: granite }), 0, -0.01, CAR_D / 2);
+box(CAR_W, 0.02, CAR_D, mat(0xe9e6df, 0.9), 0, CAR_H + 0.01, CAR_D / 2);
+box(T, CAR_H, CAR_D, steel, -CAR_W / 2 - T / 2, CAR_H / 2, CAR_D / 2);
+box(T, CAR_H, CAR_D, steel, CAR_W / 2 + T / 2, CAR_H / 2, CAR_D / 2);
+box(CAR_W, CAR_H, T, steel, 0, CAR_H / 2, CAR_D + T / 2);
+// 앞벽: 문 양옆 기둥과 문 위 상판
+const pillarW = (CAR_W - DOOR_W) / 2;
+box(pillarW, CAR_H, T, steel, -(DOOR_W / 2 + pillarW / 2), CAR_H / 2, -T / 2);
+box(pillarW, CAR_H, T, steel, DOOR_W / 2 + pillarW / 2, CAR_H / 2, -T / 2);
+box(DOOR_W, CAR_H - DOOR_H, T, steel, 0, (CAR_H + DOOR_H) / 2, -T / 2);
+// 문턱
+box(DOOR_W + 0.04, 0.02, 0.12, steelDark, 0, 0.0, -0.04);
+// 천장 조명판과 손잡이
+box(0.9, 0.012, 0.9, mat(0xffffff, 1, 0, { emissive: 0xfff4e0, emissiveIntensity: 1.6 }), 0, CAR_H - 0.006, CAR_D / 2);
+for (const s of [-1, 1]) {
+  const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, CAR_D - 0.3, 16), steelDark);
+  rail.rotation.x = Math.PI / 2;
+  rail.position.set(s * (CAR_W / 2 - 0.06), 0.92, CAR_D / 2);
+  scene.add(rail);
+}
+const backRail = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, CAR_W - 0.3, 16), steelDark);
+backRail.rotation.z = Math.PI / 2;
+backRail.position.set(0, 0.92, CAR_D - 0.06);
+scene.add(backRail);
+
+// 문: 열리면 앞벽 기둥 뒤로 숨는다
+const doorGeo = new RoundedBoxGeometry(DOOR_W / 2 + 0.01, DOOR_H, 0.035, 2, 0.008);
+const doorL = new THREE.Mesh(doorGeo, doorSteel);
+const doorR = new THREE.Mesh(doorGeo, doorSteel);
+doorL.position.set(0, DOOR_H / 2, -0.1);
+doorR.position.set(0, DOOR_H / 2, -0.1);
+scene.add(doorL, doorR);
+let doorShown = 0; // 화면에 보이는 닫힘 정도 (0 열림 ~ 1 닫힘)
+function placeDoors(p) {
+  const closedX = DOOR_W / 4, openX = DOOR_W / 4 + DOOR_W / 2 - 0.02;
+  const x = THREE.MathUtils.lerp(openX, closedX, p);
+  doorL.position.x = -x;
+  doorR.position.x = x;
+}
+
+// 문 위 층 표시기
+let floorNow = 1;
+const floorTex = canvasTexture(256, 96, () => {});
+function drawFloor(text, up) {
+  const g = floorTex.image.getContext('2d');
+  g.fillStyle = '#100808'; g.fillRect(0, 0, 256, 96);
+  g.fillStyle = '#ff4b3a'; g.font = 'bold 64px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(`${up ? '▲' : '▼'} ${text}`, 128, 52);
+  floorTex.needsUpdate = true;
+}
+drawFloor('1', false);
+const floorPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.11), new THREE.MeshBasicMaterial({ map: floorTex, toneMapped: false }));
+floorPanel.position.set(0, (CAR_H + DOOR_H) / 2, 0.002);
+scene.add(floorPanel);
+
+// ---------------------------------------------------------------- 복도
+const hallZ = -0.12 - HALL_LEN / 2;
+const hallFloor = new THREE.Mesh(new THREE.PlaneGeometry(HALL_W, HALL_LEN), mat(0xffffff, 0.55, 0, { map: tiles }));
+hallFloor.rotation.x = -Math.PI / 2;
+hallFloor.position.set(0, 0, hallZ);
+scene.add(hallFloor);
+const wallMat = mat(0xece4d2, 0.95);
+box(0.1, 2.7, HALL_LEN, wallMat, -HALL_W / 2, 1.35, hallZ);
+box(0.1, 2.7, HALL_LEN, wallMat, HALL_W / 2, 1.35, hallZ);
+box(HALL_W, 0.1, HALL_LEN, mat(0xf4f0e6, 1), 0, 2.7, hallZ);
+box(HALL_W, 2.7, 0.1, mat(0x8a6a4a, 0.8), 0, 1.35, -0.12 - HALL_LEN);
+for (let z = -2; z > -HALL_LEN; z -= 4.5) {
+  box(0.5, 0.02, 1.2, mat(0xffffff, 1, 0, { emissive: 0xfff3d0, emissiveIntensity: 1.4 }), 0, 2.64, z);
+}
+// 복도 양쪽 문과 걸레받이로 거리감을 준다
+for (let z = -3.2; z > -HALL_LEN + 1; z -= 3.6) {
+  for (const s of [-1, 1]) {
+    box(0.04, 2.0, 0.9, mat(0x6e4f36, 0.7), s * (HALL_W / 2 - 0.06), 1.0, z);
+    box(0.03, 0.03, 0.12, steelDark, s * (HALL_W / 2 - 0.1), 1.0, z + 0.3);
+  }
+}
+for (const s of [-1, 1]) box(0.02, 0.1, HALL_LEN, mat(0x5a4a3a, 0.8), s * (HALL_W / 2 - 0.06), 0.05, hallZ);
+
+// ---------------------------------------------------------------- 뛰어오는 사람
+// DrumSimulator 드러머처럼 기본 도형으로 만든 큰 머리·점 눈 캐릭터. 그룹의 +Z가 얼굴 방향
+function makePerson() {
+  const skin = mat(0xffd2b0, 0.65), shirt = mat(0xff7a2f, 0.8), pants = mat(0x34425e, 0.85);
+  const shoes = mat(0x24262c, 0.6), hairM = mat(0x3a2618, 0.9), dark = mat(0x1d1a26, 0.4);
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  root.add(body);
+
+  const leg = (s) => {
+    const p = new THREE.Group();
+    p.position.set(s * 0.09, 0.62, 0);
+    const l = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 0.4, 4, 12), pants);
+    l.position.y = -0.27;
+    const shoe = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.12, 4, 12), shoes);
+    shoe.rotation.x = Math.PI / 2;
+    shoe.scale.set(1, 1, 0.7);
+    shoe.position.set(0, -0.56, 0.05);
+    p.add(l, shoe);
+    body.add(p);
+    return p;
   };
-  const OPEN_PENALTY = 3; // 열림 버튼을 잘못 누르면 되돌아가는 닫힘 횟수
+  const legL = leg(-1), legR = leg(1);
 
-  const $ = (id) => document.getElementById(id);
-  const stage = $('stage'), panel = $('panel'), car = $('car');
-  const closeBtn = $('closeBtn'), openBtn = $('openBtn');
-  const doorL = $('doorL'), doorR = $('doorR');
-  const person = $('person'), bubble = $('bubble');
-  const overlay = $('overlay'), countdown = $('countdown');
-  const timeEl = $('time'), tapsEl = $('taps'), needEl = $('need'), floorEl = $('floor');
+  const hips = new THREE.Mesh(new RoundedBoxGeometry(0.3, 0.14, 0.2, 3, 0.05), pants);
+  hips.position.y = 0.65;
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.16, 8, 20), shirt);
+  torso.scale.z = 0.8;
+  torso.position.y = 0.88;
+  body.add(hips, torso);
 
-  let mode = null;
-  let state = 'menu'; // menu | countdown | playing | done
-  let closed = 0, presses = 0, wrong = 0;
-  let startAt = 0, raf = 0, lastPos = null;
+  const arm = (s) => {
+    const p = new THREE.Group();
+    p.position.set(s * 0.19, 1.04, 0);
+    const a = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.26, 4, 12), shirt);
+    a.position.y = -0.17;
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 12), skin);
+    hand.position.y = -0.36;
+    p.add(a, hand);
+    body.add(p);
+    return p;
+  };
+  const armL = arm(-1), armR = arm(1);
 
-  // ---- 소리 (Web Audio로 직접 만든 삑 소리와 딩동) ----
-  let ac = null;
-  function audio() {
-    if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { ac = null; } }
-    if (ac && ac.state === 'suspended') ac.resume();
-    return ac;
+  const head = new THREE.Group();
+  head.position.y = 1.3;
+  body.add(head);
+  head.add(new THREE.Mesh(new THREE.SphereGeometry(0.2, 32, 24), skin));
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.212, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.52), hairM);
+  hair.rotation.x = -0.35;
+  head.add(hair);
+  for (const s of [-1, 1]) {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(0.026, 12, 10), dark);
+    e.position.set(s * 0.075, 0.0, 0.185);
+    e.scale.z = 0.6;
+    head.add(e);
   }
-  function beep(freq, dur = 0.05, vol = 0.15, type = 'square', delay = 0) {
-    const a = audio(); if (!a) return;
-    const t = a.currentTime + delay;
-    const o = a.createOscillator(), g = a.createGain();
-    o.type = type; o.frequency.value = freq;
-    g.gain.setValueAtTime(vol, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(a.destination);
-    o.start(t); o.stop(t + dur + 0.02);
-  }
-  const ding = () => { beep(1318, 0.5, 0.2, 'sine'); beep(1046, 0.8, 0.2, 'sine', 0.35); };
-  const buzz = () => beep(110, 0.35, 0.2, 'sawtooth');
+  const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 10), mat(0x7a2430, 0.6));
+  mouth.position.set(0, -0.085, 0.18);
+  mouth.scale.set(1, 0.6, 0.4);
+  head.add(mouth);
 
-  // ---- 기록 ----
-  const bestKey = (m) => `elevator-close-best-${m}`;
-  // 저장소를 쓸 수 없는 환경(일부 내장 브라우저 등)에서도 게임은 그대로 돌아가게 한다
-  const getBest = (m) => { try { const v = parseFloat(localStorage.getItem(bestKey(m))); return Number.isFinite(v) ? v : null; } catch { return null; } };
-  const setBest = (m, v) => { try { localStorage.setItem(bestKey(m), v.toFixed(3)); } catch {} };
+  return { root, body, legL, legR, armL, armR, head, mouth };
+}
+const person = makePerson();
+scene.add(person.root);
 
-  // ---- 그리기 ----
-  function renderDoors() {
-    const p = Math.min(1, closed / mode.taps); // 0 = 활짝 열림, 1 = 다 닫힘
-    doorL.style.transform = `translateX(${-(1 - p) * 92}%)`;
-    doorR.style.transform = `translateX(${(1 - p) * 92}%)`;
-    tapsEl.textContent = closed;
-  }
-  function renderPerson(t) {
-    // t: 0(복도 끝) → 1(문 앞)
-    const s = 0.35 + t * 2.6;
-    const bob = Math.abs(Math.sin(t * 40)) * 6;
-    person.style.transform = `translateX(-50%) translateY(${-bob}px) scale(${s})`;
-    person.style.bottom = `${8 - t * 6}%`;
-    bubble.style.transform = `translateX(-50%) scale(${1 / s})`; // 말풍선은 사람 크기를 따라 커지지 않게
-    bubble.classList.toggle('show', t > 0.4);
-  }
+/** 달리기·걷기 자세. phase는 걸음 위상, stride는 보폭(0 = 서 있음), reach는 오른팔을 앞으로 뻗은 정도 */
+function posePerson(phase, stride, reach, shout) {
+  const s = Math.sin(phase);
+  person.legL.rotation.x = s * 0.9 * stride;
+  person.legR.rotation.x = -s * 0.9 * stride;
+  person.armL.rotation.x = -s * 0.8 * stride;
+  person.armR.rotation.x = THREE.MathUtils.lerp(s * 0.8 * stride, -1.55, reach);
+  person.armR.rotation.z = reach * 0.15;
+  person.body.position.y = Math.abs(Math.cos(phase)) * 0.06 * stride;
+  person.body.rotation.x = 0.18 * stride;
+  person.mouth.scale.y = shout ? 1.1 : 0.4;
+}
 
-  function resetScene() {
-    closed = 0; presses = 0; wrong = 0; lastPos = null;
-    timeEl.textContent = '0.00';
-    needEl.textContent = mode ? ` / ${mode.taps}` : '';
-    floorEl.textContent = '▼ 1F';
-    person.style.display = '';
-    person.firstChild.nextSibling.textContent = '🏃';
-    bubble.textContent = '잠깐만요~!';
-    if (mode) renderDoors();
-    renderPerson(0);
+// ---------------------------------------------------------------- 버튼
+function labelTexture(symbol, word, color) {
+  return canvasTexture(256, 256, (g, w, h) => {
+    const grd = g.createRadialGradient(w * 0.42, h * 0.38, 10, w / 2, h / 2, w / 2);
+    grd.addColorStop(0, '#ffffff'); grd.addColorStop(1, '#c4cbd2');
+    g.fillStyle = grd; g.fillRect(0, 0, w, h);
+    g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = 'bold 92px sans-serif'; g.fillText(symbol, w / 2, h * 0.43);
+    g.font = 'bold 44px sans-serif'; g.fillText(word, w / 2, h * 0.75);
+  });
+}
+/** 표면 위에 붙는 둥근 버튼. 그룹의 +Z가 버튼 앞면 방향 */
+function makeButton(r, face, hit = true) {
+  const g = new THREE.Group();
+  const bezel = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.17, r * 1.2, 0.012, 40), steelDark);
+  bezel.rotation.x = Math.PI / 2;
+  bezel.position.z = 0.006;
+  const topMat = new THREE.MeshStandardMaterial({ map: face, roughness: 0.35, metalness: 0.1, emissive: 0xffc23a, emissiveIntensity: 0 });
+  // 원기둥 윗면 UV는 옆으로 누워 있어서 글자를 바로 세운다
+  face.center.set(0.5, 0.5);
+  face.rotation = Math.PI / 2;
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.02, 40), [steel, topMat, steel]);
+  cap.rotation.x = Math.PI / 2;
+  cap.position.z = 0.018;
+  g.add(bezel, cap);
+  g.userData = { cap, topMat, glow: 0 };
+  if (hit) {
+    // 손가락으로 누르기 쉽게 실제 버튼보다 넓은 투명 판정 영역
+    const h = new THREE.Mesh(new THREE.CircleGeometry(r * 1.6, 24), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+    h.position.z = 0.03;
+    g.add(h);
+    g.userData.hit = h;
   }
+  return g;
+}
+const closeBtn = makeButton(0.07, labelTexture('▶◀', '닫힘', '#222'));
+const openBtn = makeButton(0.07, labelTexture('◀▶', '열림', '#2c5ea8'));
+closeBtn.userData.hit.userData.kind = 'close';
+openBtn.userData.hit.userData.kind = 'open';
+scene.add(closeBtn, openBtn);
 
-  // ---- 버튼 위치 ----
-  function dockButtons() {
-    for (const b of [openBtn, closeBtn]) {
-      b.classList.remove('floating');
-      b.style.left = b.style.top = '';
-    }
-    panel.appendChild(openBtn);
-    panel.appendChild(closeBtn);
-  }
-  function floatButtons() {
-    for (const b of [openBtn, closeBtn]) { b.classList.add('floating'); stage.appendChild(b); }
-    moveButtons();
-  }
-  function randomSpot(size, avoid) {
-    const r = stage.getBoundingClientRect();
-    const pad = 8, w = r.width - size - pad * 2, h = r.height - size - pad * 2;
-    let best = null;
-    for (let i = 0; i < 40; i++) {
-      const p = { x: pad + Math.random() * w, y: pad + Math.random() * h };
-      // 피해야 할 자리(직전 위치·다른 버튼)와 가장 멀리 떨어진 후보를 고른다
-      const d = Math.min(...avoid.map((a) => Math.hypot(a.x - p.x, a.y - p.y)), Infinity);
-      if (d > size * 1.6) return p;
-      if (!best || d > best.d) best = { ...p, d };
-    }
-    return best;
-  }
-  function place(btn, p) { btn.style.left = `${p.x}px`; btn.style.top = `${p.y}px`; }
-  function moveButtons() {
-    const size = closeBtn.offsetWidth || 76;
-    const c = randomSpot(size, lastPos ? [lastPos] : []);
-    place(closeBtn, c);
-    lastPos = c;
-    // 열림 버튼도 같이 옮겨 헷갈리게 하되 닫힘 버튼과 겹치지는 않게
-    const o = randomSpot(size, [c]);
-    place(openBtn, o);
-  }
+// 고정 모드용 조작반: 오른쪽 기둥 앞면
+const panelX = DOOR_W / 2 + pillarW / 2;
+const plate = new THREE.Mesh(new RoundedBoxGeometry(pillarW - 0.03, 0.62, 0.012, 2, 0.006), mat(0x23262b, 0.4, 0.6));
+plate.position.set(panelX, 1.2, 0.006);
+scene.add(plate);
+for (let i = 0; i < 6; i++) {
+  const n = 6 - i;
+  const face = canvasTexture(128, 128, (g, w, h) => {
+    g.fillStyle = '#3a3f46'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#c9ced4'; g.font = 'bold 72px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(String(n), w / 2, h / 2 + 4);
+  });
+  const b = makeButton(0.032, face, false);
+  b.position.set(panelX + (i % 2 ? 1 : -1) * 0.07, 1.42 - Math.floor(i / 2) * 0.09, 0.012);
+  scene.add(b);
+}
+const FRONT = new THREE.Vector3(0, 0, 1);
+const FIXED = {
+  open: new THREE.Vector3(panelX - 0.08, 1.04, 0.013),
+  close: new THREE.Vector3(panelX + 0.08, 1.04, 0.013),
+};
 
-  // ---- 진행 ----
-  function flash(btn) {
-    btn.classList.add('pressed');
-    setTimeout(() => btn.classList.remove('pressed'), 70);
-  }
-  function onClose(e) {
-    e.preventDefault();
-    if (state !== 'playing') return;
-    presses++;
-    closed++;
-    beep(880 + closed * 12, 0.04);
-    flash(closeBtn);
-    renderDoors();
-    if (closed >= mode.taps) return finish(true);
-    if (mode === MODES.random) moveButtons();
-  }
-  function onOpen(e) {
-    e.preventDefault();
-    if (state !== 'playing') return;
-    wrong++;
-    closed = Math.max(0, closed - OPEN_PENALTY);
-    buzz();
-    flash(openBtn);
-    car.classList.remove('shake'); void car.offsetWidth; car.classList.add('shake');
-    renderDoors();
-    if (mode === MODES.random) moveButtons();
-  }
-  closeBtn.addEventListener('pointerdown', onClose);
-  openBtn.addEventListener('pointerdown', onOpen);
-  // 연타 중에 더블탭 확대나 길게 누르기 메뉴가 뜨지 않게
-  document.addEventListener('dblclick', (e) => e.preventDefault());
-  document.addEventListener('contextmenu', (e) => e.preventDefault());
+function attach(btn, point, normal) {
+  btn.position.copy(point);
+  btn.lookAt(point.clone().add(normal));
+  // 다음 프레임을 그리기 전에 들어온 탭도 새 위치로 판정하게 바로 갱신한다
+  btn.updateMatrixWorld(true);
+}
+function dockButtons() {
+  attach(openBtn, FIXED.open, FRONT);
+  attach(closeBtn, FIXED.close, FRONT);
+}
 
-  function tick(now) {
+// 랜덤 모드에서 버튼이 붙을 수 있는 면: 양옆 벽, 앞벽 기둥, 천장, 바닥 (u·v는 0~1)
+const SURFACES = [
+  { n: [1, 0, 0],  side: [0, 0, 1], at: (u, v) => [-CAR_W / 2, 1.05 + u * 1.0, 0.15 + v * 1.2] },
+  { n: [-1, 0, 0], side: [0, 0, 1], at: (u, v) => [CAR_W / 2, 1.05 + u * 1.0, 0.15 + v * 1.2] },
+  { n: [0, 0, 1],  side: [1, 0, 0], at: (u, v) => [-(DOOR_W / 2 + 0.09 + u * (pillarW - 0.18)), 0.35 + v * 1.7, 0] },
+  // 오른쪽 기둥은 조작반 위아래만
+  { n: [0, 0, 1],  side: [1, 0, 0], at: (u, v) => [DOOR_W / 2 + 0.09 + u * (pillarW - 0.18), v < 0.5 ? 0.3 + v * 1.1 : 1.62 + (v - 0.5) * 0.8, 0] },
+  { n: [0, -1, 0], side: [1, 0, 0], at: (u, v) => [-0.65 + u * 1.3, CAR_H - 0.012, 0.15 + v * 0.95] },
+  { n: [0, 1, 0],  side: [1, 0, 0], at: (u, v) => [-0.65 + u * 1.3, 0.0, 0.2 + v * 0.7] },
+];
+const tmpV = new THREE.Vector3(), tmpW = new THREE.Vector3();
+function toScreen(p, out = new THREE.Vector2()) {
+  tmpV.copy(p).project(camera);
+  return out.set((tmpV.x + 1) / 2 * view.clientWidth, (1 - tmpV.y) / 2 * view.clientHeight);
+}
+/** 화면 안에 충분히 크게 보이고, 피해야 할 화면 위치들과 떨어진 자리를 고른다 */
+function randomSpot(avoid) {
+  let best = null;
+  for (let i = 0; i < 80; i++) {
+    const s = SURFACES[Math.random() * SURFACES.length | 0];
+    const point = new THREE.Vector3(...s.at(Math.random(), Math.random()));
+    const normal = new THREE.Vector3(...s.n);
+    const side = new THREE.Vector3(...s.side);
+    const up = new THREE.Vector3().crossVectors(normal, side);
+    tmpV.copy(point).project(camera);
+    if (Math.abs(tmpV.x) > 0.84 || Math.abs(tmpV.y) > 0.84 || tmpV.z > 1) continue;
+    const scr = toScreen(point);
+    // 너무 비스듬하거나 멀어서 작게 보이면 누르기 어렵다
+    const px = Math.min(
+      scr.distanceTo(toScreen(tmpW.copy(point).addScaledVector(side, 0.07))),
+      scr.distanceTo(toScreen(tmpW.copy(point).addScaledVector(up, 0.07))),
+    );
+    if (px < 14) continue;
+    const d = Math.min(Infinity, ...avoid.map((a) => a.distanceTo(scr)));
+    const score = Math.min(d, 260) + px;
+    if (!best || score > best.score) best = { point, normal, scr, score };
+    if (d > 180 && px > 20) break;
+  }
+  return best;
+}
+let lastScreen = null;
+function moveButtons() {
+  const c = randomSpot(lastScreen ? [lastScreen] : []);
+  attach(closeBtn, c.point, c.normal);
+  const o = randomSpot([c.scr, ...(lastScreen ? [lastScreen] : [])]);
+  attach(openBtn, o.point, o.normal);
+  lastScreen = c.scr;
+}
+
+// ---------------------------------------------------------------- 카메라 맞추기
+function resize() {
+  const w = view.clientWidth, h = view.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  // 세로 화면에서도 문과 오른쪽 조작반이 모두 들어오게 가로 시야를 확보한다
+  const needH = 2 * Math.atan(0.78 / EYE.z);
+  const vFromH = 2 * Math.atan(Math.tan(needH / 2) / camera.aspect);
+  camera.fov = THREE.MathUtils.radToDeg(Math.max(THREE.MathUtils.degToRad(58), vFromH));
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(view);
+resize();
+
+// ---------------------------------------------------------------- 소리
+let ac = null;
+function audio() {
+  if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { ac = null; } }
+  if (ac && ac.state === 'suspended') ac.resume();
+  return ac;
+}
+function beep(freq, dur = 0.05, vol = 0.15, type = 'square', delay = 0) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delay;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+const ding = () => { beep(1318, 0.5, 0.2, 'sine'); beep(1046, 0.8, 0.2, 'sine', 0.35); };
+const buzz = () => beep(110, 0.35, 0.2, 'sawtooth');
+
+// ---------------------------------------------------------------- 기록
+// 저장소를 쓸 수 없는 환경(일부 내장 브라우저 등)에서도 게임은 그대로 돌아가게 한다
+const bestKey = (m) => `elevator-close-best-${m}`;
+const getBest = (m) => { try { const v = parseFloat(localStorage.getItem(bestKey(m))); return Number.isFinite(v) ? v : null; } catch { return null; } };
+const setBest = (m, v) => { try { localStorage.setItem(bestKey(m), v.toFixed(3)); } catch {} };
+
+// ---------------------------------------------------------------- 진행
+let mode = null, modeKey = null;
+let state = 'menu'; // menu | countdown | playing | win | lose | done
+let closed = 0, presses = 0, wrong = 0;
+let startAt = 0, endAt = 0, shake = 0;
+let bubbleText = '';
+
+function setBubble(text) {
+  bubbleText = text;
+  bubble.textContent = text;
+  bubble.classList.toggle('show', !!text);
+}
+
+function resetScene() {
+  closed = 0; presses = 0; wrong = 0; lastScreen = null;
+  doorShown = 0; placeDoors(0);
+  floorNow = 1; drawFloor('1', false);
+  person.root.position.set(0, 0, START_Z);
+  person.root.rotation.set(0, 0, 0);
+  posePerson(0, 0, 0, false);
+  setBubble('');
+  timeEl.textContent = '0.00';
+  tapsEl.textContent = '0';
+  needEl.textContent = mode ? ` / ${mode.taps}` : '';
+}
+
+function onClose() {
+  presses++;
+  closed++;
+  beep(880 + closed * 12, 0.04);
+  closeBtn.userData.glow = 1;
+  tapsEl.textContent = closed;
+  if (closed >= mode.taps) return finish('win');
+  if (modeKey === 'random') moveButtons();
+}
+function onOpen() {
+  wrong++;
+  closed = Math.max(0, closed - OPEN_PENALTY);
+  buzz();
+  openBtn.userData.glow = 1;
+  shake = 0.25;
+  tapsEl.textContent = closed;
+  if (modeKey === 'random') moveButtons();
+}
+
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (state !== 'playing') return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hit = raycaster.intersectObjects([closeBtn.userData.hit, openBtn.userData.hit])[0];
+  if (!hit) return;
+  if (hit.object.userData.kind === 'close') onClose(); else onOpen();
+});
+// 연타 중에 더블탭 확대나 길게 누르기 메뉴가 뜨지 않게
+document.addEventListener('dblclick', (e) => e.preventDefault());
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+function start(key) {
+  modeKey = key;
+  mode = MODES[key];
+  resetScene();
+  overlay.classList.add('hidden');
+  if (key === 'random') moveButtons(); else dockButtons();
+  state = 'countdown';
+  audio();
+  let n = 3;
+  const step = () => {
+    if (state !== 'countdown') return;
+    if (n > 0) { countdown.textContent = n; beep(660, 0.08, 0.12, 'sine'); n--; setTimeout(step, 600); return; }
+    countdown.textContent = '닫아!';
+    beep(1320, 0.12, 0.15, 'sine');
+    setTimeout(() => (countdown.textContent = ''), 400);
+    state = 'playing';
+    startAt = performance.now();
+  };
+  step();
+}
+
+function finish(result) {
+  state = result;
+  endAt = performance.now();
+  timeEl.textContent = ((endAt - startAt) / 1000).toFixed(2);
+  if (result === 'win') ding();
+  else { buzz(); shake = 0.35; }
+}
+
+function showResult(won) {
+  state = 'done';
+  const el = (endAt - startAt) / 1000;
+  let body;
+  if (won) {
+    const prev = getBest(modeKey);
+    const isBest = prev === null || el < prev;
+    if (isBest) setBest(modeKey, el);
+    body = `
+      <h2>🚪 문 닫힘!</h2>
+      <p>오늘도 혼자 탔습니다. 평화롭네요.</p>
+      <div class="big">${el.toFixed(2)}초</div>
+      <p>초당 ${(presses / el).toFixed(1)}회 연타${wrong ? ` · 열림 실수 ${wrong}번` : ''}</p>
+      <p>${isBest ? '<span class="newbest">🏆 최고 기록!</span>' : `최고 기록 ${prev.toFixed(2)}초`}</p>`;
+  } else {
+    body = `
+      <h2>😅 같이 타게 됐습니다…</h2>
+      <p>문이 ${Math.round(Math.min(1, closed / mode.taps) * 100)}%쯤 닫혔을 때 손이 쑥 들어왔어요.</p>
+      <p>어색한 침묵 속에 2층까지 올라갑니다.</p>`;
+  }
+  overlay.innerHTML = `<div class="card">${body}
+    <div class="row">
+      <button class="btn primary" data-act="retry">다시 하기</button>
+      <button class="btn ghost" data-act="menu">모드 선택</button>
+    </div></div>`;
+  overlay.classList.remove('hidden');
+}
+
+function showMenu() {
+  state = 'menu';
+  mode = null; modeKey = null;
+  resetScene();
+  dockButtons();
+  const item = (key, i) => {
+    const m = MODES[key], b = getBest(key);
+    return `<button class="mode" data-mode="${key}">
+      <b>${i}. ${m.name}</b>
+      <span>${m.desc}</span>
+      <span>닫힘 ${m.taps}번 · 상대 도착까지 ${m.arrive}초 · <span class="best">${b === null ? '기록 없음' : `최고 ${b.toFixed(2)}초`}</span></span>
+    </button>`;
+  };
+  overlay.innerHTML = `<div class="card">
+    <h1>🛗 닫힘 버튼 연타</h1>
+    <p>엘리베이터에 나 혼자. 저 멀리서 누가 뛰어온다.<br>오기 전에 문을 닫아라!</p>
+    <div class="modes">${item('fixed', 1)}${item('random', 2)}</div>
+    <a class="home" href="../index.html">← 게임 목록</a>
+  </div>`;
+  overlay.classList.remove('hidden');
+}
+
+overlay.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-mode],[data-act]');
+  if (!t) return;
+  if (t.dataset.mode) start(t.dataset.mode);
+  else if (t.dataset.act === 'retry') start(modeKey);
+  else showMenu();
+});
+
+// ---------------------------------------------------------------- 매 프레임
+const smooth = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
+const ease = (u) => { u = THREE.MathUtils.clamp(u, 0, 1); return u * u * (3 - 2 * u); };
+const HEAD_UP = new THREE.Vector3(0, 0.3, 0);
+let last = performance.now();
+let idlePhase = 0;
+
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  let doorTarget = mode ? closed / mode.taps : 0;
+  const u = (now - endAt) / 1000; // 끝난 뒤 흐른 시간
+
+  if (state === 'menu' || state === 'countdown') {
+    // 복도 끝에서 제자리 걸음으로 기다린다
+    idlePhase += dt * 3;
+    posePerson(idlePhase, 0.15, 0, false);
+  } else if (state === 'playing') {
     const el = (now - startAt) / 1000;
     timeEl.textContent = el.toFixed(2);
     const t = Math.min(1, el / mode.arrive);
-    renderPerson(t);
-    if (t >= 1) return finish(false);
-    raf = requestAnimationFrame(tick);
-  }
-
-  function start(key) {
-    mode = MODES[key];
-    mode.key = key;
-    resetScene();
-    overlay.classList.add('hidden');
-    if (key === 'random') floatButtons(); else dockButtons();
-    closeBtn.disabled = openBtn.disabled = true;
-    state = 'countdown';
-    audio();
-    let n = 3;
-    const step = () => {
-      if (n > 0) { countdown.textContent = n; beep(660, 0.08, 0.12, 'sine'); n--; setTimeout(step, 600); return; }
-      countdown.textContent = '닫아!';
-      beep(1320, 0.12, 0.15, 'sine');
-      setTimeout(() => (countdown.textContent = ''), 400);
-      closeBtn.disabled = openBtn.disabled = false;
-      state = 'playing';
-      startAt = performance.now();
-      raf = requestAnimationFrame(tick);
-    };
-    step();
-  }
-
-  function finish(win) {
-    state = 'done';
-    cancelAnimationFrame(raf);
-    closeBtn.disabled = openBtn.disabled = true;
-    const el = (performance.now() - startAt) / 1000;
-    timeEl.textContent = el.toFixed(2);
-    let body;
-    if (win) {
-      ding();
-      floorEl.textContent = '▲ 2F';
-      bubble.textContent = '아…';
-      const prev = getBest(mode.key);
-      const isBest = prev === null || el < prev;
-      if (isBest) setBest(mode.key, el);
-      const cps = presses / el;
-      body = `
-        <h2>🚪 문 닫힘!</h2>
-        <p>오늘도 혼자 탔습니다. 평화롭네요.</p>
-        <div class="big">${el.toFixed(2)}초</div>
-        <p>초당 ${cps.toFixed(1)}회 연타${wrong ? ` · 열림 실수 ${wrong}번` : ''}</p>
-        <p>${isBest ? '<span class="newbest">🏆 최고 기록!</span>' : `최고 기록 ${prev.toFixed(2)}초`}</p>`;
+    person.root.position.z = THREE.MathUtils.lerp(START_Z, ARRIVE_Z, t);
+    const reach = THREE.MathUtils.clamp((t - 0.82) / 0.18, 0, 1);
+    posePerson(el * 11, 1 - reach * 0.6, reach, t > 0.35);
+    if (t > 0.35 && !bubbleText) setBubble('잠깐만요~!');
+    if (t >= 1) finish('lose');
+  } else if (state === 'win') {
+    // 문이 닫히고 엘리베이터가 출발한다
+    doorTarget = 1;
+    if (u > 0.25 && u < 0.9) { if (bubbleText !== '아…') setBubble('아…'); }
+    else if (u >= 0.9 && bubbleText) setBubble('');
+    if (u > 0.5 && floorNow === 1) { floorNow = 2; drawFloor('2', true); }
+    if (u > 0.4 && u < 1.3) shake = Math.max(shake, 0.05);
+    if (u > 1.5) showResult(true);
+  } else if (state === 'lose') {
+    // 손이 문 사이로 들어오고 → 문이 다시 열리고 → 들어와서 돌아선 뒤 → 문이 닫힌다
+    if (u < 0.5) {
+      posePerson(0, 0.2, 1, true);
+      doorTarget = u < 0.2 ? Math.min(doorTarget, 0.6) : 0;
+    } else if (u < 1.6) {
+      doorTarget = 0;
+      if (bubbleText !== '감사합니다^^') setBubble('감사합니다^^');
+      const w = ease((u - 0.5) / 1.1);
+      person.root.position.z = THREE.MathUtils.lerp(ARRIVE_Z, 0.45, w);
+      posePerson(u * 7, 0.5 * (1 - w), 0, false);
+    } else if (u < 2.1) {
+      doorTarget = 0;
+      person.root.rotation.y = Math.PI * ease((u - 1.6) / 0.5);
+      posePerson(0, 0, 0, false);
     } else {
-      buzz();
-      person.firstChild.nextSibling.textContent = '🧍';
-      bubble.textContent = '감사합니다^^';
-      bubble.classList.add('show');
-      const pct = Math.round((closed / mode.taps) * 100);
-      closed = 0; renderDoors(); // 센서에 걸려 문이 다시 열린다
-      car.classList.remove('shake'); void car.offsetWidth; car.classList.add('shake');
-      body = `
-        <h2>😅 같이 타게 됐습니다…</h2>
-        <p>문이 ${pct}%쯤 닫혔을 때 손이 쑥 들어왔어요.</p>
-        <p>어색한 침묵 속에 2층까지 올라갑니다.</p>`;
+      doorTarget = 1;
+      if (u > 2.3 && bubbleText) setBubble('');
+      if (u > 3.0 && floorNow === 1) { floorNow = 2; drawFloor('2', true); }
+      if (u > 3.3) showResult(false);
     }
-    setTimeout(() => {
-      overlay.innerHTML = `<div class="card">${body}
-        <div class="row">
-          <button class="btn primary" data-act="retry">다시 하기</button>
-          <button class="btn ghost" data-act="menu">모드 선택</button>
-        </div></div>`;
-      overlay.classList.remove('hidden');
-    }, win ? 700 : 900);
+  } else if (state === 'done') {
+    doorTarget = 1;
   }
 
-  function showMenu() {
-    state = 'menu';
-    cancelAnimationFrame(raf);
-    mode = null;
-    dockButtons();
-    resetScene();
-    doorL.style.transform = 'translateX(-92%)';
-    doorR.style.transform = 'translateX(92%)';
-    tapsEl.textContent = '0';
-    const item = (key) => {
-      const m = MODES[key], b = getBest(key);
-      return `<button class="mode" data-mode="${key}">
-        <b>${key === 'fixed' ? '1' : '2'}. ${m.name}</b>
-        <span>${m.desc}</span>
-        <span>닫힘 ${m.taps}번 · 상대 도착까지 ${m.arrive}초 · <span class="best">${b === null ? '기록 없음' : `최고 ${b.toFixed(2)}초`}</span></span>
-      </button>`;
-    };
-    overlay.innerHTML = `<div class="card">
-      <h1>🛗 닫힘 버튼 연타</h1>
-      <p>엘리베이터에 나 혼자. 저 멀리서 누가 뛰어온다.<br>오기 전에 문을 닫아라!</p>
-      <div class="modes">${item('fixed')}${item('random')}</div>
-      <a class="home" href="../index.html">← 게임 목록</a>
-    </div>`;
-    overlay.classList.remove('hidden');
+  doorShown = smooth(doorShown, doorTarget, state === 'lose' ? 6 : 22, dt);
+  placeDoors(doorShown);
+
+  // 누른 버튼은 살짝 들어가고 노랗게 빛난다
+  for (const b of [closeBtn, openBtn]) {
+    const d = b.userData;
+    d.glow = Math.max(0, d.glow - dt * 9);
+    d.topMat.emissiveIntensity = d.glow * 0.9;
+    d.cap.position.z = 0.018 - d.glow * 0.009;
   }
 
-  overlay.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-mode],[data-act]');
-    if (!t) return;
-    if (t.dataset.mode) start(t.dataset.mode);
-    else if (t.dataset.act === 'retry') start(mode.key);
-    else showMenu();
-  });
-  window.addEventListener('resize', () => { if (state === 'playing' && mode === MODES.random) moveButtons(); });
+  camera.position.copy(EYE);
+  if (shake > 0) {
+    shake = Math.max(0, shake - dt);
+    camera.position.x += (Math.random() - 0.5) * 0.02;
+    camera.position.y += (Math.random() - 0.5) * 0.02;
+  }
 
-  showMenu();
-})();
+  renderer.render(scene, camera);
+
+  // 말풍선은 사람 머리 위 화면 위치를 따라간다
+  if (bubbleText) {
+    const s = toScreen(person.head.getWorldPosition(tmpW).add(HEAD_UP));
+    bubble.style.left = `${THREE.MathUtils.clamp(s.x, 70, view.clientWidth - 70)}px`;
+    bubble.style.top = `${Math.max(40, s.y)}px`;
+  }
+  requestAnimationFrame(frame);
+}
+
+showMenu();
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>
