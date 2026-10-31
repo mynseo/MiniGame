@@ -1,4 +1,4 @@
-# MiniGame · 동네 오락실
+# 민서민서김
 
 브라우저에서 바로 하는 미니 게임 모음입니다. 설치·빌드 없이 HTML 파일 하나씩으로 돌아갑니다.
 
@@ -21,6 +21,23 @@
 마을 → 간선 → 광역 → 심야버스로 갈수록 기사님이 거칠어집니다.
 
 최고 기록은 모두 브라우저에 저장되고, 첫 화면 카드에 표시됩니다.
+
+## 3D 모델 규칙
+
+모든 게임의 사람·동물은 [`shared/minseo3d.js`](shared/minseo3d.js)의 기본 도형 캐릭터로 만듭니다 (DrumSimulator 드러머와 같은 생김새).
+
+- 큰 공 머리 + 바가지 머리카락 + 작은 점 눈. 코·입은 없고, 놀랄 때만 동그란 입이 열립니다.
+- 몸통·팔다리는 캡슐, 신발은 둥근 캡슐. 무광 재질에 부드러운 그림자, 영화 같은 톤(ACES).
+- 정해 둔 동네 사람 색 조합(`MS3D.LOOKS`): `me`, `drummer`, `office`, `student`, `granny`, `driver`, `runner`, `cat`.
+
+```js
+const p = MS3D.person(MS3D.LOOKS.office);   // 서 있는 사람 (얼굴 +Z, 원점은 발밑)
+p.arm('R', 2.9, 0.1, 0.1);                   // 손잡이 잡기: 팔을 위로
+p.run(phase);                                // 뛰기 한 프레임
+p.panic(true);                               // 놀란 얼굴
+p.update(time);                              // 눈 깜빡임
+MS3D.person({ ...MS3D.LOOKS.granny, sit: true }); // 앉은 사람
+```
 
 ## 새 게임 추가하기
 
