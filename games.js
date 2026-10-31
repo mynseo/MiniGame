@@ -18,23 +18,5 @@ window.GAMES = [
     color: '#5cc46a',
     added: '2026-10-31',
     best: { key: 'bus-hold-best', unit: '정류장' }
-  },
-  {
-    id: 'bus-2d',
-    title: '급정거 버스',
-    desc: '3D 버전의 원조. 옆에서 본 버스 안에서 급정거를 버틴다.',
-    controls: ['기울기', '터치', '키보드'],
-    color: '#2a5fc4',
-    added: '2026-10-30',
-    best: { key: 'bus-hold-best', unit: '정류장' }
-  },
-  {
-    id: 'gull-mast',
-    title: '갈매기 돛대',
-    desc: '흔들리는 배 위, 끝없이 높은 돛대를 좌우 번갈아 탭해서 오른다. 어깨에 앉는 갈매기를 조심!',
-    controls: ['터치', '키보드'],
-    color: '#d8432e',
-    added: '2026-10-30',
-    best: { key: 'gull-mast-best', unit: 'm' }
   }
 ];
