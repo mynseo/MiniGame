@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>급정거 버스</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gowun+Dodum&display=swap">
+<style>
+/* Layout: canvas is the bus interior cut-away; LED destination sign + look-ahead strip on top, balance gauge at bottom, cards centered */
+:root {
+  --night: #141a2e;
+  --panel: rgba(20, 26, 46, 0.9);
+  --led: #ffa526;
+  --led-dim: #5a3a10;
+  --pole: #f3c623;
+  --danger: #e5483a;
+  --paper: #f5f3ee;
+  --sign: "Do Hyeon", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "Gowun Dodum", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--night); color: var(--paper); font-family: var(--body);
+  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#ui { position: fixed; inset: 0; pointer-events: none; display: grid; grid-template-rows: auto 1fr auto; gap: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: calc(env(safe-area-inset-top, 0px) + 12px) calc(env(safe-area-inset-bottom, 0px) + 14px); }
+#top { display: grid; gap: 8px; max-width: 720px; width: 100%; margin: 0 auto; }
+#led { font-family: var(--sign); font-size: clamp(18px, 4.8vw, 26px); color: var(--led); background: #0b0b0d;
+  border: 3px solid #2b2b30; border-radius: 6px; padding: 6px 12px; white-space: nowrap; overflow: hidden;
+  text-shadow: 0 0 8px rgba(255,165,38,.55); letter-spacing: .02em; }
+#led.alert { color: #ff5a44; text-shadow: 0 0 10px rgba(255,90,68,.7); animation: ledblink .35s steps(2) infinite; }
+@keyframes ledblink { 50% { opacity: .35; } }
+#stats { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-variant-numeric: tabular-nums; }
+#stops { font-family: var(--sign); font-size: clamp(22px, 6vw, 30px); text-shadow: 0 2px 0 rgba(0,0,0,.4); }
+#stops small { font-family: var(--body); font-size: 13px; opacity: .85; margin-left: 6px; }
+#meters { display: flex; gap: 12px; font-size: 14px; }
+#meters b { font-family: var(--sign); font-weight: 400; font-size: 20px; }
+#route { font-size: 12px; background: var(--pole); color: #1a1a1a; border-radius: 3px; padding: 2px 7px; font-weight: 700; }
+#ahead { position: relative; height: 30px; background: rgba(11,11,13,.72); border-radius: 15px; overflow: hidden; }
+#ahead::before { content: ""; position: absolute; left: 30px; right: 12px; top: 50%; border-top: 2px dashed rgba(245,243,238,.28); }
+#ahead .lbl { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 11px; opacity: .5; }
+.ic { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center; font-family: var(--sign); font-size: 13px; color: #111; }
+.ic.bus { left: 16px; background: var(--pole); border-radius: 4px; width: 24px; }
+.ic.stop { background: var(--paper); border-radius: 4px; }
+.ic.light { border: 3px solid #222; }
+.ic.bump { background: #c6c2b8; border-radius: 10px 10px 2px 2px; height: 12px; }
+.ic.cat { background: var(--danger); color: var(--paper); animation: ledblink .3s steps(2) infinite; }
+#mid { display: grid; place-items: center; position: relative; }
+.card { pointer-events: auto; background: var(--panel); border-radius: 8px; padding: 20px; width: min(380px, 100%);
+  border-top: 8px solid var(--pole); box-shadow: 0 14px 40px rgba(0,0,0,.4); }
+.card h1 { margin: 0; font-family: var(--sign); font-weight: 400; font-size: 42px; line-height: 1; text-wrap: balance; }
+.card h1 span { color: var(--led); }
+.lead { margin: 8px 0 12px; font-size: 15px; opacity: .9; }
+.rules { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px; font-size: 14px; line-height: 1.45; }
+.rules li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; }
+.rules b { background: var(--pole); color: #1a1a1a; border-radius: 3px; text-align: center; font-family: var(--sign); font-weight: 400; line-height: 20px; height: 20px; }
+.btns { display: grid; gap: 8px; margin-top: 16px; }
+.btn { font-family: var(--sign); font-size: 20px; border: 0; border-radius: 5px; padding: 12px; cursor: pointer; }
+.btn.main { background: var(--pole); color: #1a1a1a; }
+.btn.sub { background: transparent; color: var(--paper); border: 1px solid rgba(245,243,238,.35); }
+.back { display: block; text-align: center; text-decoration: none; font-size: 16px; }
+.btn:focus-visible, #mute:focus-visible { outline: 3px solid var(--led); outline-offset: 2px; }
+.note { font-size: 12px; opacity: .7; margin: 10px 0 0; line-height: 1.45; }
+#res .lab { font-size: 13px; letter-spacing: .1em; opacity: .8; }
+#rscore { font-family: var(--sign); font-size: 64px; line-height: 1; color: var(--pole); font-variant-numeric: tabular-nums; }
+#rtitle { font-family: var(--sign); font-size: 24px; margin-top: 8px; }
+#rcom { font-size: 14px; opacity: .85; margin-top: 4px; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; font-variant-numeric: tabular-nums; }
+.facts div { background: rgba(245,243,238,.07); border-radius: 4px; padding: 7px 8px; font-size: 12px; opacity: .95; }
+.facts b { display: block; font-family: var(--sign); font-weight: 400; font-size: 19px; }
+#rbest.new { color: var(--led); }
+#pop { position: absolute; top: 12%; left: 0; right: 0; text-align: center; font-family: var(--sign);
+  font-size: clamp(26px, 7vw, 42px); color: var(--pole); text-shadow: 0 3px 0 rgba(0,0,0,.55); opacity: 0; }
+#pop.show { animation: pop 1.5s ease-out forwards; }
+@keyframes pop { 0% { opacity: 0; transform: scale(.7); } 12% { opacity: 1; transform: scale(1.06); } 22% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-12px); } }
+#toast { position: absolute; bottom: 4%; left: 0; right: 0; margin: auto; width: fit-content; max-width: 100%;
+  background: var(--panel); border-left: 4px solid var(--led); padding: 8px 12px; font-size: 13px; border-radius: 4px; }
+#bottom { display: grid; gap: 6px; max-width: 520px; width: 100%; margin: 0 auto; }
+#gauge { position: relative; height: 18px; border-radius: 9px; background:
+  linear-gradient(90deg, var(--danger) 0 12%, rgba(245,243,238,.18) 12% 88%, var(--danger) 88% 100%); }
+#gauge .mid { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: var(--paper); opacity: .6; }
+#lean { position: absolute; top: 50%; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: var(--paper);
+  transform: translateY(-50%); box-shadow: 0 0 0 3px rgba(0,0,0,.35); }
+#input { position: absolute; bottom: -9px; width: 0; height: 0; margin-left: -6px; border: 6px solid transparent; border-bottom-color: var(--pole); }
+#legend { display: flex; justify-content: space-between; font-size: 12px; opacity: .8; }
+#mute { pointer-events: auto; font: inherit; font-size: 12px; color: var(--paper); background: var(--panel);
+  border: 1px solid rgba(245,243,238,.25); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { #led.alert, .ic.cat { animation: none; } #pop.show { animation-duration: .01s; opacity: 1; } }
+</style>
+
+<canvas id="c" aria-label="급정거 버스 게임 화면"></canvas>
+<div id="ui">
+  <div id="top">
+    <div id="led">다음 정류장 ▶ 은행나무사거리</div>
+    <div id="stats">
+      <div id="stops">0<small>정류장 버팀</small></div>
+      <div id="meters"><span><b id="kmh">0</b> km/h</span><span><b id="gee">0.00</b> G</span><span id="route">마을</span></div>
+    </div>
+    <div id="ahead"><div class="ic bus">▶</div><span class="lbl">150m</span></div>
+  </div>
+  <div id="mid">
+    <div class="card" id="intro">
+      <h1>급정거 <span>버스</span></h1>
+      <p class="lead">손잡이를 놓쳤습니다. 다음 정류장까지 두 발로만 버티세요.</p>
+      <ul class="rules">
+        <li><b>1</b><span>급정거하면 몸이 앞(오른쪽)으로, 급출발하면 뒤(왼쪽)로 쏠립니다.</span></li>
+        <li><b>2</b><span>폰을 쏠리는 반대쪽으로 기울여 버티세요. PC는 ← → 키를 누르고 있으면 됩니다. 너무 버티면 반대로 넘어져요.</span></li>
+        <li><b>3</b><span>위쪽 줄에 신호등·정류장·과속방지턱이 미리 보입니다. 고양이는 예고 없이 뛰어듭니다.</span></li>
+      </ul>
+      <div class="btns">
+        <button class="btn main" id="startTilt" type="button">폰 기울여서 시작</button>
+        <button class="btn sub" id="startKeys" type="button">키보드·터치로 시작</button>
+        <a class="btn sub back" href="../index.html">← 게임 목록</a>
+      </div>
+      <p class="note" id="introNote">터치 모드: 화면 왼쪽이나 오른쪽을 누르고 있으면 그쪽으로 버팁니다.</p>
+    </div>
+    <div class="card" id="res" hidden>
+      <div class="lab">버틴 정류장</div>
+      <div id="rscore">0</div>
+      <div id="rtitle"></div>
+      <div id="rcom"></div>
+      <div class="facts">
+        <div>이동 거리<b id="rdist">0</b></div>
+        <div>최대 쏠림<b id="rg">0</b></div>
+        <div id="rbest">최고<b id="rbestv">0</b></div>
+      </div>
+      <div class="btns"><button class="btn main" id="again" type="button">다음 버스 타기</button><a class="btn sub back" href="../index.html">← 게임 목록</a></div>
+    </div>
+    <div id="pop"></div>
+    <div id="toast" hidden></div>
+  </div>
+  <div id="bottom">
+    <div id="gauge"><div class="mid"></div><div id="lean"></div><div id="input"></div></div>
+    <div id="legend"><span>◀ 뒤로 쏠림</span><button id="mute" type="button">소리 켜짐</button><span>앞으로 쏠림 ▶</span></div>
+  </div>
+</div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// ---- tuning ----
+// body = inverted pendulum on the feet. +theta = leaning toward the bus front (right side of screen).
+const P = { K_LEG: 15, GRAV: 9, INERTIA: 1.25, DAMP: 2.4, PUSH: 7, FAIL: 0.85 };
+const STAGES = [
+  { name: '마을', label: '마을버스', color: '#3f9a4b', vmax: 11, go: 1.6, brake: 2.0, jerk: 5, red: 0.5, cat: 0, noise: 0.25 },
+  { name: '간선', label: '간선버스', color: '#2a5fc4', vmax: 13.5, go: 2.4, brake: 2.8, jerk: 8, red: 0.6, cat: 1 / 30, noise: 0.35 },
+  { name: '광역', label: '광역버스', color: '#c8392b', vmax: 16, go: 3.2, brake: 3.8, jerk: 12, red: 0.7, cat: 1 / 20, noise: 0.45 },
+  { name: '심야', label: '심야버스', color: '#2f3275', vmax: 17, go: 3.8, brake: 4.8, jerk: 18, red: 0.75, cat: 1 / 14, noise: 0.6 }
+];
+const stageOf = n => n < 2 ? 0 : n < 5 ? 1 : n < 9 ? 2 : 3;
+const STOP_NAMES = ['은행나무사거리', '시장입구', '구청앞', '한빛도서관', '중앙병원', '버들마을', '소방서', '체육공원',
+  '강변역', '문화센터', '새말초등학교', '터미널', '공단삼거리', '느티나무공원', '시청', '대학정문', '수목원', '차고지'];
+const RANKS = [
+  { n: 0, t: '첫차 승객', c: '버스가 출발하자마자 넘어졌다.' },
+  { n: 2, t: '출근길 직장인', c: '정류장 두어 개는 버틸 수 있다.' },
+  { n: 5, t: '환승 고수', c: '브레이크 밟기 전에 이미 몸이 반응한다.' },
+  { n: 9, t: '서서 조는 달인', c: '광역버스에서도 손잡이가 필요 없다.' },
+  { n: 13, t: '기사님도 놀란 승객', c: '심야버스 급정거도 무릎으로 받아냈다.' },
+  { n: 18, t: '버스 서핑 국가대표', c: '차고지까지 두 발로 서서 갔다.' }
+];
+
+// ---- canvas ----
+const cv = $('c'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, ppm = 80;
+function resize() {
+  DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ppm = Math.min(W / 4.2, H / 4.6);
+}
+addEventListener('resize', resize); resize();
+
+// ---- state ----
+let st = 'intro', t = 0;
+let busX, v, a, cmdNoise, noiseT, objs, segEnd, stops, stopIdx, catT, maxG, stage;
+let th, om, u, uTarget, fallT, npcs, strapA, strapV, shake, pitch, doorOpen, alertT, lastAlert;
+let best = 0;
+try { best = +localStorage.getItem('bus-hold-best') || 0; } catch (e) {}
+
+function reset() {
+  busX = 0; v = 0; a = 0; cmdNoise = 0; noiseT = 0; objs = []; segEnd = 0; stops = 0; stopIdx = 0;
+  catT = rand(16, 24); maxG = 0; stage = 0;
+  th = 0; om = 0; u = 0; uTarget = 0; fallT = 0; strapA = 0; strapV = 0; shake = 0; pitch = 0; doorOpen = 0;
+  alertT = 0; lastAlert = '';
+  npcs = [
+    { x: -1.05, th: 0, om: 0, fall: 0, shirt: '#7d8b6a', hair: '#3a2a1e', strap: true },
+    { x: 1.75, th: 0, om: 0, fall: 0, shirt: '#b0607a', hair: '#1d1d1d', strap: false }
+  ];
+  planSegment(); planSegment();
+}
+function planSegment() {
+  const start = segEnd, end = start + (segEnd === 0 ? 120 : rand(150, 210));
+  const n = segEnd === 0 ? 1 : 1 + (Math.random() < 0.5 ? 1 : 0);
+  for (let k = 1; k <= n; k++) objs.push({ type: 'light', x: start + (end - start) * k / (n + 1) + rand(-12, 12), color: 'green', willStop: null, t: 0, wait: 0 });
+  if (segEnd > 0 && Math.random() < 0.55) objs.push({ type: 'bump', x: start + rand(30, end - start - 30), hit: 0 });
+  objs.push({ type: 'stop', x: end, name: STOP_NAMES[stopIdx++ % STOP_NAMES.length], done: false, wait: 0 });
+  objs.sort((p, q) => p.x - q.x);
+  segEnd = end;
+}
+reset();
+
+// ---- input ----
+const keys = { l: false, r: false }, touches = new Map();
+let mode = 'keys', tiltRaw = 0, tiltBase = null, tiltSeen = false;
+function refreshTarget() {
+  let l = keys.l, r = keys.r;
+  for (const s of touches.values()) { if (s < 0) l = true; else r = true; }
+  uTarget = (r ? 1 : 0) - (l ? 1 : 0);
+}
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft' || k === 'a') { keys.l = true; e.preventDefault(); }
+  else if (k === 'arrowright' || k === 'd') { keys.r = true; e.preventDefault(); }
+  else if ((k === ' ' || k === 'enter') && st === 'result') { e.preventDefault(); begin(mode); return; }
+  else return;
+  if (st === 'intro') begin('keys');
+  refreshTarget();
+});
+addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft' || k === 'a') keys.l = false;
+  if (k === 'arrowright' || k === 'd') keys.r = false;
+  refreshTarget();
+});
+cv.addEventListener('pointerdown', e => { e.preventDefault(); touches.set(e.pointerId, e.clientX < W / 2 ? -1 : 1); refreshTarget(); });
+for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) cv.addEventListener(ev, e => { touches.delete(e.pointerId); refreshTarget(); });
+
+function onOrient(e) {
+  if (e.gamma == null) return;
+  tiltSeen = true;
+  const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  let val = e.gamma;
+  if (ang === 90) val = e.beta; else if (ang === -90 || ang === 270) val = -e.beta; else if (ang === 180) val = -e.gamma;
+  if (tiltBase === null) tiltBase = val;
+  tiltRaw = val - tiltBase;
+}
+async function enableTilt() {
+  try {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== 'granted') return false;
+    }
+    if (typeof DeviceOrientationEvent === 'undefined') return false;
+    addEventListener('deviceorientation', onOrient);
+    return true;
+  } catch (e) { return false; }
+}
+function toast(msg, ms = 4200) {
+  const el = $('toast'); el.textContent = msg; el.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, ms);
+}
+$('startTilt').addEventListener('click', async () => {
+  ensureAudio();
+  const ok = await enableTilt();
+  begin(ok ? 'tilt' : 'keys');
+  if (!ok) { toast('기울기 센서를 켤 수 없어 터치 모드로 시작했어요. 화면 왼쪽·오른쪽을 누르고 있으면 버팁니다.'); return; }
+  setTimeout(() => {
+    if (!tiltSeen && mode === 'tilt') { mode = 'keys'; toast('기울기 센서 값이 들어오지 않아 터치 모드로 바꿨어요. 화면 왼쪽·오른쪽을 누르고 있으면 버팁니다.'); }
+  }, 1300);
+});
+$('startKeys').addEventListener('click', () => { ensureAudio(); begin('keys'); });
+$('again').addEventListener('click', () => begin(mode));
+if (!matchMedia('(pointer: coarse)').matches) {
+  $('startTilt').hidden = true;
+  $('startKeys').textContent = '시작 (← → 키)';
+  $('introNote').textContent = '← → 키 대신 A, D 키도 됩니다. 키를 꾹 누르고 있을수록 강하게 버팁니다.';
+}
+
+function begin(m) {
+  ensureAudio();
+  reset(); mode = m; tiltBase = null; st = 'play';
+  $('intro').hidden = true; $('res').hidden = true;
+  if (m === 'tilt') toast('지금 들고 있는 각도가 똑바로 선 자세예요.', 2500);
+}
+
+// ---- audio ----
+let AC = null, master = null, eng = null, engGain = null, muted = false;
+try { muted = localStorage.getItem('bus-hold-muted') === '1'; } catch (e) {}
+function ensureAudio() {
+  if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    master = AC.createGain(); master.gain.value = muted ? 0 : 0.5; master.connect(AC.destination);
+    eng = AC.createOscillator(); eng.type = 'sawtooth'; eng.frequency.value = 38;
+    const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260;
+    engGain = AC.createGain(); engGain.gain.value = 0.05;
+    eng.connect(lp); lp.connect(engGain); engGain.connect(master); eng.start();
+  } catch (e) { AC = null; }
+}
+function tone(f, d, type = 'sine', g = 0.2, f2) {
+  if (!AC) return;
+  const o = AC.createOscillator(), gn = AC.createGain(), n = AC.currentTime;
+  o.type = type; o.frequency.setValueAtTime(f, n);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, n + d);
+  gn.gain.setValueAtTime(g, n); gn.gain.exponentialRampToValueAtTime(0.0001, n + d);
+  o.connect(gn); gn.connect(master); o.start(n); o.stop(n + d + 0.02);
+}
+function noise(d, g, fc, type = 'lowpass') {
+  if (!AC) return;
+  const n = AC.currentTime, len = Math.floor(AC.sampleRate * d);
+  const buf = AC.createBuffer(1, len, AC.sampleRate), ch = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const s = AC.createBufferSource(), f = AC.createBiquadFilter(), gn = AC.createGain();
+  s.buffer = buf; f.type = type; f.frequency.value = fc; gn.gain.value = g;
+  s.connect(f); f.connect(gn); gn.connect(master); s.start(n);
+}
+const sfx = {
+  bell: () => { tone(988, 0.35, 'sine', 0.14); setTimeout(() => tone(784, 0.5, 'sine', 0.14), 220); },
+  door: () => noise(0.5, 0.3, 2500, 'bandpass'),
+  squeal: s => tone(1800 + s * 200, 0.6, 'sine', 0.03 + s * 0.01, 1400),
+  meow: () => tone(700, 0.35, 'triangle', 0.1, 1100),
+  thud: () => noise(0.25, 0.6, 220),
+  bump: () => noise(0.15, 0.45, 160),
+  ding: () => { tone(660, 0.2, 'square', 0.05); setTimeout(() => tone(990, 0.3, 'square', 0.05), 120); }
+};
+function setMuteLabel() { $('mute').textContent = muted ? '소리 꺼짐' : '소리 켜짐'; }
+setMuteLabel();
+$('mute').addEventListener('click', () => {
+  muted = !muted; setMuteLabel(); ensureAudio();
+  try { localStorage.setItem('bus-hold-muted', muted ? '1' : '0'); } catch (e) {}
+  if (master) master.gain.value = muted ? 0 : 0.5;
+});
+
+// ---- ui helpers ----
+function pop(text) { const p = $('pop'); p.textContent = text; p.classList.remove('show'); void p.offsetWidth; p.classList.add('show'); }
+function led(text, alert) {
+  const el = $('led');
+  if (el.textContent !== text) el.textContent = text;
+  el.classList.toggle('alert', !!alert);
+}
+
+// ---- bus driver ----
+function blocking(o) {
+  return (o.type === 'stop' && !o.done) || (o.type === 'light' && o.color !== 'green') || (o.type === 'cat' && !o.gone);
+}
+function driver(dt, S) {
+  let cmd = v < S.vmax - 0.4 ? S.go * (1 - Math.pow(v / S.vmax, 3) * 0.6) : (S.vmax - v) * 1.5;
+  let target = null, d = 1e9;
+  for (const o of objs) {
+    const dd = o.x - busX;
+    if (dd < -0.5) continue;
+    if (blocking(o) && dd < d) { d = dd; target = o; }
+    if (o.type === 'bump' && dd < 22 && dd > -1 && v > 7) cmd = Math.min(cmd, (7 - v) * 1.4);
+  }
+  let stopped = false;
+  if (target) {
+    const dd = Math.max(d - 0.3, 0.02), need = v * v / (2 * dd);
+    if (target.braking || need >= S.brake) { target.braking = true; cmd = -Math.min(need * 1.08, 8.5); }
+    if (dd < 1.2 && v < 0.5) { stopped = true; cmd = -3; target.wait += dt; }
+    if (target.braking && dd > 3 && v < 0.6) cmd = 1.0; // crept short of the line: roll up gently
+  }
+  noiseT -= dt;
+  if (noiseT <= 0) { noiseT = rand(0.3, 0.9); cmdNoise = v > 2 ? rand(-1, 1) * S.noise : 0; }
+  return { cmd: cmd + cmdNoise, target, stopped };
+}
+
+function simulate(dt) {
+  t += dt;
+  const S = STAGES[stage];
+  // world objects
+  for (const o of objs) {
+    const d = o.x - busX;
+    if (o.type === 'light') {
+      if (o.willStop === null && d < 90) o.willStop = Math.random() < S.red;
+      if (o.color === 'green' && o.willStop && d < 75 && d > 2) {
+        const need = v * v / (2 * Math.max(d - 1, 0.5));
+        if (need < 5.5) { o.color = 'yellow'; o.t = 0; } else o.willStop = false;
+      } else if (o.color === 'yellow') { o.t += dt; if (o.t > 1.1) o.color = 'red'; }
+      else if (o.color === 'red' && o.wait > (o.hold || (o.hold = rand(1.8, 3.2)))) { o.color = 'green'; o.willStop = false; o.braking = false; }
+    } else if (o.type === 'stop' && !o.done && o.wait > 0) {
+      if (doorOpen === 0 && o.wait > 0.3) { doorOpen = 0.001; sfx.door(); sfx.bell(); }
+      if (o.wait > 3.2) {
+        o.done = true; o.braking = false;
+        if (st === 'play') { stops++; sfx.ding(); pop(`${o.name} · ${stops}번째`); }
+        const ns = stageOf(stops);
+        if (ns !== stage && st === 'play') { stage = ns; setTimeout(() => pop(`${STAGES[ns].label}로 환승!`), 900); }
+      }
+    } else if (o.type === 'cat' && !o.gone && o.wait > 0.9) { o.gone = true; o.braking = false; }
+    else if (o.type === 'bump') {
+      if (o.hit === 0 && d < 0) { o.hit = 1; bumpKick(); }
+      else if (o.hit === 1 && d < -5.8) { o.hit = 2; bumpKick(); }
+    }
+  }
+  objs = objs.filter(o => o.x - busX > -40);
+  if (segEnd - busX < 400) planSegment();
+  // surprise cat
+  if (S.cat > 0 && st === 'play') {
+    catT -= dt;
+    if (catT <= 0 && v > 8) {
+      objs.push({ type: 'cat', x: busX + v * v / (2 * rand(6.2, 7.6)) + 0.8, wait: 0, gone: false, braking: true });
+      objs.sort((p, q) => p.x - q.x);
+      catT = rand(0.7, 1.3) / S.cat; sfx.meow(); pop('고양이!'); alertT = 1.6; lastAlert = '급정거! 고양이가 뛰어들었어요';
+    }
+  }
+  // bus motion: commanded accel, limited by the driver's jerk
+  const dr = driver(dt, S);
+  if (st === 'fall' || st === 'result') { dr.cmd = v > 0 ? -2.5 : 0; }
+  a += clamp(dr.cmd - a, -S.jerk * dt, S.jerk * dt);
+  v += a * dt;
+  if (v <= 0) { v = 0; if (a < 0) a = 0; } // the moment the wheels stop, decel snaps to zero: the classic rock-back
+  busX += v * dt;
+  if (doorOpen > 0) { doorOpen = Math.min(1, doorOpen + dt * 3); if (v > 0.5) doorOpen = 0; }
+  if (dr.target && dr.target.braking && a < -4.2 && Math.random() < dt * 2) sfx.squeal(-a - 4);
+  maxG = Math.max(maxG, Math.abs(a) / 9.8);
+  // straps swing forward when braking
+  strapV += (-14 * strapA - 1.4 * strapV - a * 0.16) * dt; strapA += strapV * dt;
+  pitch += ((-a * 0.0045) - pitch) * Math.min(1, dt * 6);
+  shake = Math.max(0, shake - dt * 4);
+  // player body
+  if (st === 'play') {
+    if (mode === 'tilt') {
+      let tl = tiltRaw; tl = Math.abs(tl) < 2 ? 0 : tl - Math.sign(tl) * 2;
+      u += (clamp(tl / 22, -1, 1) - u) * Math.min(1, dt * 15);
+    } else {
+      const rate = uTarget === 0 ? 6 : 3.5;
+      u += clamp(uTarget - u, -rate * dt, rate * dt);
+    }
+    const acc = -P.K_LEG * th + P.GRAV * Math.sin(th) - P.INERTIA * a * Math.cos(th) - P.DAMP * om + P.PUSH * u;
+    om += acc * dt; th += om * dt;
+    if (Math.abs(th) > P.FAIL) fall();
+  } else if (st === 'fall' || st === 'result') {
+    if (Math.abs(th) < 1.48) { om += (9 * Math.sin(th) - 0.3 * om) * dt * 1.4; th += om * dt; }
+    else { th = 1.48 * Math.sign(th); if (Math.abs(om) > 1) { sfx.thud(); shake = 0.6; } om = 0; }
+    fallT += dt;
+    if (st === 'fall' && fallT > 1.9) finish();
+  } else { th = 0.03 * Math.sin(t * 0.9); }
+  // other passengers hold on, until someone lands on them
+  for (const n of npcs) {
+    if (n.fall) {
+      if (Math.abs(n.th) < 1.4) { n.om += (9 * Math.sin(n.th)) * dt * 1.4; n.th += n.om * dt; }
+      else { if (Math.abs(n.om) > 1) { sfx.thud(); shake = 0.5; } n.th = 1.4 * Math.sign(n.th); n.om = 0; }
+    } else {
+      n.om += (-22 * n.th - 3 * n.om - 0.5 * a * (n.strap ? 0.5 : 0.8)) * dt; n.th += n.om * dt;
+    }
+  }
+}
+function bumpKick() {
+  sfx.bump(); shake = 1;
+  if (st === 'play') om += rand(-0.5, 0.5) * (0.6 + v / 10);
+  for (const n of npcs) n.om += rand(-0.3, 0.3);
+}
+function fall() {
+  st = 'fall'; fallT = 0;
+  pop(th > 0 ? '앞으로 꽈당!' : '뒤로 꽈당!');
+  const dir = Math.sign(th);
+  const hit = npcs.filter(n => Math.sign(n.x - 0.3) === dir).sort((p, q) => Math.abs(p.x) - Math.abs(q.x));
+  hit.forEach((n, i) => setTimeout(() => { n.fall = 1; n.th = dir * 0.25; n.om = dir * 1.5; }, 300 + i * 260));
+  if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {}
+}
+function finish() {
+  st = 'result';
+  const isBest = stops > best;
+  if (isBest) { best = stops; try { localStorage.setItem('bus-hold-best', String(best)); } catch (e) {} }
+  let r = RANKS[0]; for (const k of RANKS) if (stops >= k.n) r = k;
+  $('rscore').textContent = stops + '개';
+  $('rtitle').textContent = r.t; $('rcom').textContent = r.c;
+  $('rdist').textContent = busX < 1000 ? Math.round(busX) + 'm' : (busX / 1000).toFixed(2) + 'km';
+  $('rg').textContent = maxG.toFixed(2) + 'G';
+  $('rbestv').textContent = best + '개';
+  $('rbest').classList.toggle('new', isBest && stops > 0);
+  $('rbest').firstChild.textContent = isBest && stops > 0 ? '최고 갱신!' : '최고';
+  $('res').hidden = false;
+}
+
+// ---- per-frame ui ----
+const aheadEl = $('ahead'), aheadPool = [];
+function frameUI(dt) {
+  $('kmh').textContent = Math.round(v * 3.6);
+  $('gee').textContent = (Math.abs(a) / 9.8).toFixed(2);
+  const sTxt = String(stops);
+  if ($('stops').firstChild.textContent !== sTxt) $('stops').firstChild.textContent = sTxt;
+  const S = STAGES[stage]; if ($('route').textContent !== S.name) $('route').textContent = S.name;
+  // look-ahead strip, 0..150 m
+  const vis = objs.filter(o => { const d = o.x - busX; return d > -2 && d < 150 && !(o.type === 'cat' && o.gone) && !(o.type === 'stop' && o.done); });
+  while (aheadPool.length < vis.length) { const e = document.createElement('div'); aheadEl.appendChild(e); aheadPool.push(e); }
+  const span = Math.max(40, aheadEl.clientWidth - 50);
+  aheadPool.forEach((e, i) => {
+    const o = vis[i];
+    if (!o) { e.style.display = 'none'; return; }
+    e.style.display = '';
+    const cls = 'ic ' + o.type; if (e.className !== cls) e.className = cls;
+    e.style.left = (34 + clamp((o.x - busX) / 150, 0, 1) * span) + 'px';
+    if (o.type === 'light') { e.style.background = o.color === 'green' ? '#3cc65a' : o.color === 'yellow' ? '#f5c518' : '#e5483a'; e.textContent = ''; }
+    else e.textContent = o.type === 'stop' ? '정' : o.type === 'cat' ? '!' : '';
+  });
+  // LED sign
+  alertT = Math.max(0, alertT - dt);
+  const next = objs.find(o => o.type === 'stop' && !o.done && o.x - busX > -1);
+  const red = objs.find(o => o.type === 'light' && o.color !== 'green' && o.x - busX > 0 && o.x - busX < 90);
+  if (st === 'intro') led('다음 정류장 ▶ ' + STOP_NAMES[0]);
+  else if (st !== 'play') led('잠시 정차합니다. 다치신 분 계신가요?', true);
+  else if (alertT > 0) led(lastAlert, true);
+  else if (next && next.wait > 0) led(`이번 정류장은 ${next.name}입니다`);
+  else if (red) led(red.color === 'yellow' ? '신호 바뀝니다 · 감속' : '빨간불 · 정지합니다');
+  else if (v < 1 && a > 0.1) led('출발합니다! 꽉 잡으세요');
+  else led('다음 정류장 ▶ ' + (next ? next.name : ''));
+  // gauge
+  $('lean').style.left = (50 + clamp(th / P.FAIL, -1.1, 1.1) * 38) + '%';
+  $('lean').style.background = Math.abs(th) > P.FAIL * 0.7 ? 'var(--danger)' : 'var(--paper)';
+  $('input').style.left = (50 + u * 38) + '%';
+  if (engGain) { eng.frequency.value = 34 + v * 2.6 + Math.max(0, a) * 5; engGain.gain.value = st === 'intro' ? 0.02 : 0.045; }
+}
+
+// ---- rendering (meters, y up; local x: 0 = player, bus front windshield at 2.45) ----
+let FY = 0;
+const SX = lx => W / 2 + (lx - 0.45) * ppm;
+const SY = ly => FY - ly * ppm;
+const FRONT = 2.45;
+function mulberry(n) { let x = Math.sin(n * 127.1) * 43758.5453; return x - Math.floor(x); }
+const SKIES = [['#8fd0ef', '#dff3fb'], ['#f0b07a', '#fbe1b8'], ['#e7795b', '#f6c48d'], ['#0f1533', '#28315e']];
+function drawOutside(x0, x1, y0, y1) {
+  const night = stage === 3;
+  const g = ctx.createLinearGradient(0, SY(y1), 0, SY(y0));
+  g.addColorStop(0, SKIES[stage][0]); g.addColorStop(1, SKIES[stage][1]);
+  ctx.fillStyle = g; ctx.fillRect(SX(x0), SY(y1), (x1 - x0) * ppm, (y1 - y0) * ppm);
+  // far buildings (parallax 0.3)
+  const far = busX * 0.3, bw = 2.2;
+  for (let i = Math.floor((far + x0 - 3) / bw); i * bw < far + x1 + 3; i++) {
+    const lx = i * bw - far, hgt = 1.6 + mulberry(i) * 2.4;
+    ctx.fillStyle = night ? '#1d2346' : 'rgba(120,135,160,.55)';
+    ctx.fillRect(SX(lx), SY(0.6 + hgt), (bw - 0.15) * ppm, hgt * ppm);
+    if (night) { ctx.fillStyle = '#f6d36b'; for (let k = 0; k < 4; k++) if (mulberry(i * 7 + k) > 0.5) ctx.fillRect(SX(lx + 0.3 + (k % 2) * 0.9), SY(1.2 + hgt - 0.5 - Math.floor(k / 2) * 0.6), 0.25 * ppm, 0.2 * ppm); }
+  }
+  // near: street trees and lamp posts (parallax 1)
+  const near = busX, tw = 7;
+  for (let i = Math.floor((near + x0 - 4) / tw); i * tw < near + x1 + 4; i++) {
+    const lx = i * tw - near + 3;
+    if (mulberry(i + 50) > 0.45) {
+      ctx.fillStyle = '#6b4a2e'; ctx.fillRect(SX(lx - 0.06), SY(1.8), 0.12 * ppm, 1.3 * ppm);
+      ctx.fillStyle = night ? '#1f3b2c' : '#4f9a4f'; ctx.beginPath(); ctx.arc(SX(lx), SY(2.15), 0.55 * ppm, 0, 7); ctx.fill();
+    } else {
+      ctx.fillStyle = '#5c6470'; ctx.fillRect(SX(lx - 0.04), SY(2.6), 0.08 * ppm, 2.1 * ppm);
+      ctx.fillStyle = night ? '#ffe9a6' : '#cfd5dc'; ctx.fillRect(SX(lx - 0.04), SY(2.62), 0.35 * ppm, 0.08 * ppm);
+    }
+  }
+  // world objects pass by
+  for (const o of objs) {
+    const lx = o.x - busX + FRONT + 0.3;
+    if (lx < x0 - 2 || lx > x1 + 2) continue;
+    if (o.type === 'light') {
+      ctx.fillStyle = '#30343b'; ctx.fillRect(SX(lx - 0.05), SY(2.5), 0.1 * ppm, 2.1 * ppm);
+      ctx.fillRect(SX(lx - 0.2), SY(2.75), 0.4 * ppm, 0.9 * ppm);
+      const cols = ['#e5483a', '#f5c518', '#3cc65a'], on = o.color === 'red' ? 0 : o.color === 'yellow' ? 1 : 2;
+      cols.forEach((c, k) => { ctx.fillStyle = k === on ? c : '#4a4e55'; ctx.beginPath(); ctx.arc(SX(lx), SY(2.6 - k * 0.28), 0.1 * ppm, 0, 7); ctx.fill(); });
+    } else if (o.type === 'stop') {
+      ctx.fillStyle = 'rgba(200,225,240,.55)'; ctx.fillRect(SX(lx - 1.6), SY(2.3), 1.6 * ppm, 1.7 * ppm);
+      ctx.fillStyle = '#2a5fc4'; ctx.fillRect(SX(lx - 1.7), SY(2.45), 1.8 * ppm, 0.18 * ppm);
+      ctx.fillStyle = '#f5f3ee'; ctx.font = `${Math.round(0.13 * ppm)}px ${getFont()}`; ctx.textBaseline = 'middle';
+      ctx.fillText(o.name, SX(lx - 1.6), SY(2.36));
+    } else if (o.type === 'cat' && !o.gone) {
+      ctx.fillStyle = '#e08a2e'; ctx.beginPath(); ctx.ellipse(SX(lx), SY(0.75), 0.22 * ppm, 0.1 * ppm, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(SX(lx + 0.2), SY(0.86), 0.09 * ppm, 0, 7); ctx.fill();
+    }
+  }
+}
+let fontCache = '';
+function getFont() { return fontCache || (fontCache = getComputedStyle(document.body).fontFamily); }
+function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function drawPerson(lx, ang, o) {
+  const u2 = ppm;
+  ctx.save(); ctx.translate(SX(lx), SY(0)); ctx.rotate(ang);
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = o.pants || '#2c3550'; ctx.lineWidth = 0.13 * u2;
+  ctx.beginPath(); ctx.moveTo(-0.1 * u2, 0); ctx.lineTo(0, -0.88 * u2); ctx.lineTo(0.12 * u2, 0); ctx.stroke();
+  ctx.fillStyle = '#1b1b1f'; ctx.fillRect(-0.18 * u2, -0.05 * u2, 0.16 * u2, 0.06 * u2); ctx.fillRect(0.06 * u2, -0.05 * u2, 0.16 * u2, 0.06 * u2);
+  if (o.pack) { ctx.fillStyle = o.pack; rrect(-0.34 * u2, -1.4 * u2, 0.2 * u2, 0.48 * u2, 0.06 * u2); ctx.fill(); }
+  ctx.fillStyle = o.shirt; rrect(-0.15 * u2, -1.47 * u2, 0.3 * u2, 0.62 * u2, 0.1 * u2); ctx.fill();
+  ctx.fillStyle = '#efc49e'; ctx.beginPath(); ctx.arc(0.03 * u2, -1.6 * u2, 0.13 * u2, 0, 7); ctx.fill();
+  ctx.fillStyle = o.hair; ctx.beginPath(); ctx.arc(0.0, -1.63 * u2, 0.135 * u2, Math.PI * 0.95, Math.PI * 2.05); ctx.fill();
+  ctx.fillStyle = '#1b1b1f'; ctx.beginPath(); ctx.arc(0.1 * u2, -1.6 * u2, 0.018 * u2, 0, 7); ctx.fill();
+  const stress = o.stress || 0;
+  ctx.strokeStyle = '#1b1b1f'; ctx.lineWidth = 0.02 * u2; ctx.beginPath();
+  if (stress > 0.55) ctx.arc(0.12 * u2, -1.52 * u2, 0.03 * u2, 0, 7); else { ctx.moveTo(0.07 * u2, -1.52 * u2); ctx.lineTo(0.13 * u2, -1.52 * u2); }
+  ctx.stroke();
+  ctx.strokeStyle = o.shirt; ctx.lineWidth = 0.09 * u2;
+  let hx, hy;
+  if (o.strapHand) { hx = 0.02; hy = -2.05; }
+  else if (o.poleHand != null) { hx = o.poleHand; hy = -1.25; }
+  else if (stress > 0.5) { const w = t * 16; hx = Math.cos(w) * 0.35; hy = -1.4 + Math.sin(w) * 0.35; }
+  else { hx = 0.28; hy = -1.12; }
+  ctx.beginPath(); ctx.moveTo(0, -1.38 * u2); ctx.quadraticCurveTo((hx * 0.5 + 0.08) * u2, (-1.3 + (hy + 1.3) * 0.3) * u2, hx * u2, hy * u2); ctx.stroke();
+  ctx.fillStyle = '#efc49e'; ctx.beginPath(); ctx.arc(hx * u2, hy * u2, 0.05 * u2, 0, 7); ctx.fill();
+  if (o.phone && stress <= 0.5) { ctx.fillStyle = '#222'; ctx.fillRect((hx - 0.02) * u2, (hy - 0.12) * u2, 0.06 * u2, 0.12 * u2); }
+  ctx.restore();
+}
+function render() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const S = STAGES[stage];
+  FY = H * 0.56 + 1.3 * ppm;
+  ctx.fillStyle = S.color; ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  const sh = shake * 0.05 * ppm * Math.sin(t * 60);
+  ctx.translate(W / 2, FY + sh); ctx.rotate(pitch); ctx.translate(-W / 2, -FY);
+  const L = -12, R = 6;
+  // road + wheels below, roof sign above
+  ctx.fillStyle = '#3a3d44'; ctx.fillRect(0, SY(-0.75), W, H);
+  ctx.fillStyle = '#f5f3ee';
+  for (let x = Math.floor((busX - 20) / 4) * 4; x < busX + 20; x += 4) ctx.fillRect(SX(x - busX - 6), SY(-1.25), 1.8 * ppm, 0.1 * ppm);
+  for (const wx of [-3.6, 2.1]) {
+    ctx.save(); ctx.translate(SX(wx), SY(-0.3)); ctx.rotate(busX / 0.45);
+    ctx.fillStyle = '#1b1b1f'; ctx.beginPath(); ctx.arc(0, 0, 0.45 * ppm, 0, 7); ctx.fill();
+    ctx.fillStyle = '#9aa0a8'; ctx.beginPath(); ctx.arc(0, 0, 0.22 * ppm, 0, 7); ctx.fill();
+    ctx.fillStyle = '#1b1b1f'; for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(Math.cos(k * 1.257) * 0.13 * ppm, Math.sin(k * 1.257) * 0.13 * ppm, 0.035 * ppm, 0, 7); ctx.fill(); }
+    ctx.restore();
+  }
+  ctx.fillStyle = S.color; ctx.fillRect(SX(L), SY(-0.12), (R - L) * ppm, 0.3 * ppm);
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(SX(L), SY(2.95), (R - L) * ppm, 0.35 * ppm);
+  ctx.fillStyle = '#0b0b0d'; rrect(SX(-1.2), SY(3.35), 2.6 * ppm, 0.38 * ppm, 0.05 * ppm); ctx.fill();
+  ctx.fillStyle = '#ffa526'; ctx.font = `${Math.round(0.26 * ppm)}px ${getFont()}`; ctx.textBaseline = 'middle';
+  ctx.fillText(['마을 07', '간선 471', '광역 9401', '심야 N16'][stage], SX(-1.05), SY(3.16));
+  // interior shell
+  ctx.fillStyle = '#e9e6df'; ctx.fillRect(SX(L), SY(2.55), (R - L) * ppm, 2.55 * ppm);
+  // windows + windshield
+  ctx.save(); ctx.beginPath();
+  for (let x = -11.5; x < 1.7; x += 1.55) ctx.rect(SX(x), SY(2.05), 1.35 * ppm, 0.95 * ppm);
+  ctx.rect(SX(FRONT), SY(2.35), 1.6 * ppm, 1.55 * ppm);
+  ctx.clip(); drawOutside(L, R, 0.8, 2.6); ctx.restore();
+  ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 0.05 * ppm;
+  for (let x = -11.5; x < 1.7; x += 1.55) ctx.strokeRect(SX(x), SY(2.05), 1.35 * ppm, 0.95 * ppm);
+  // ad strip / route map
+  ctx.fillStyle = '#d7d2c7'; ctx.fillRect(SX(L), SY(2.42), (FRONT - L) * ppm, 0.3 * ppm);
+  const ns = objs.filter(o => o.type === 'stop' && !o.done).slice(0, 2);
+  ctx.font = `${Math.round(clamp(0.12 * ppm, 10, 15))}px ${getFont()}`; ctx.textBaseline = 'middle';
+  ctx.strokeStyle = S.color; ctx.lineWidth = 0.04 * ppm; ctx.beginPath(); ctx.moveTo(SX(-2.6), SY(2.27)); ctx.lineTo(SX(2.2), SY(2.27)); ctx.stroke();
+  ns.forEach((o, i) => {
+    const x = -1.4 + i * 2.2;
+    ctx.fillStyle = i === 0 ? S.color : '#f5f3ee'; ctx.strokeStyle = S.color; ctx.lineWidth = 0.03 * ppm;
+    ctx.beginPath(); ctx.arc(SX(x), SY(2.27), 0.06 * ppm, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2a2a2a'; ctx.fillText(o.name, SX(x + 0.1), SY(2.27));
+  });
+  // driver cab
+  ctx.fillStyle = '#c9c4b8'; ctx.fillRect(SX(FRONT - 0.15), SY(1.25), 0.15 * ppm, 1.25 * ppm);
+  ctx.fillStyle = '#303540'; rrect(SX(FRONT + 0.45), SY(1.05), 0.5 * ppm, 0.6 * ppm, 0.05 * ppm); ctx.fill();
+  ctx.fillStyle = '#efc49e'; ctx.beginPath(); ctx.arc(SX(FRONT + 0.75), SY(1.62), 0.12 * ppm, 0, 7); ctx.fill();
+  ctx.fillStyle = '#2b3a67'; ctx.beginPath(); ctx.arc(SX(FRONT + 0.75), SY(1.66), 0.125 * ppm, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = '#2b3a67'; rrect(SX(FRONT + 0.6), SY(1.48), 0.32 * ppm, 0.45 * ppm, 0.08 * ppm); ctx.fill();
+  ctx.strokeStyle = '#1b1b1f'; ctx.lineWidth = 0.05 * ppm; ctx.beginPath(); ctx.ellipse(SX(FRONT + 1.15), SY(1.25), 0.05 * ppm, 0.2 * ppm, -0.4, 0, 7); ctx.stroke();
+  // rear door
+  const dx0 = -2.75, dx1 = -1.75, dop = doorOpen;
+  ctx.fillStyle = '#7d8590'; ctx.fillRect(SX(dx0), SY(2.1), (dx1 - dx0) * ppm, 2.1 * ppm);
+  if (dop > 0) { ctx.save(); ctx.beginPath(); ctx.rect(SX(dx0 + 0.05), SY(2.05), (dx1 - dx0 - 0.1) * ppm, 2.05 * ppm); ctx.clip(); drawOutside(dx0, dx1, 0, 2.1); ctx.restore(); }
+  const half = (dx1 - dx0) / 2, slide = half * 0.9 * dop;
+  ctx.fillStyle = 'rgba(160,185,200,.85)';
+  ctx.fillRect(SX(dx0 + 0.05 - slide), SY(2.05), (half - 0.05) * ppm, 2.05 * ppm);
+  ctx.fillRect(SX(dx0 + half + slide), SY(2.05), (half - 0.05) * ppm, 2.05 * ppm);
+  ctx.fillStyle = '#e5483a'; ctx.fillRect(SX(dx0 - 0.05), SY(2.25), 0.2 * ppm, 0.12 * ppm);
+  // seats at the back
+  for (const sx of [-4.2, -5.6]) {
+    ctx.fillStyle = S.color; rrect(SX(sx - 0.25), SY(1.05), 0.55 * ppm, 0.6 * ppm, 0.08 * ppm); ctx.fill();
+    rrect(SX(sx - 0.3), SY(0.55), 0.7 * ppm, 0.15 * ppm, 0.05 * ppm); ctx.fill();
+    ctx.fillStyle = '#9c6a52'; rrect(SX(sx - 0.05), SY(1.05 + Math.sin(t * 3 + sx) * 0.01), 0.3 * ppm, 0.5 * ppm, 0.1 * ppm); ctx.fill();
+    ctx.fillStyle = '#efc49e'; ctx.beginPath(); ctx.arc(SX(sx + 0.12), SY(1.2), 0.12 * ppm, 0, 7); ctx.fill();
+  }
+  // ceiling rail + straps
+  ctx.strokeStyle = '#b9bec5'; ctx.lineWidth = 0.05 * ppm; ctx.beginPath(); ctx.moveTo(SX(-3.4), SY(2.43)); ctx.lineTo(SX(2.2), SY(2.43)); ctx.stroke();
+  for (let x = -3.1; x < 2.2; x += 0.55) {
+    const ang = strapA + Math.sin(t * 2 + x) * 0.02, ex = x + Math.sin(ang) * 0.36, ey = 2.43 - Math.cos(ang) * 0.36;
+    ctx.strokeStyle = '#5a6068'; ctx.lineWidth = 0.035 * ppm; ctx.beginPath(); ctx.moveTo(SX(x), SY(2.43)); ctx.lineTo(SX(ex), SY(ey)); ctx.stroke();
+    ctx.strokeStyle = '#f3c623'; ctx.lineWidth = 0.04 * ppm; ctx.beginPath(); ctx.arc(SX(ex + Math.sin(ang) * 0.07), SY(ey - 0.07), 0.07 * ppm, 0, 7); ctx.stroke();
+  }
+  // poles
+  ctx.fillStyle = '#f3c623';
+  for (const px of [-1.6, 1.35]) ctx.fillRect(SX(px - 0.03), SY(2.43), 0.06 * ppm, 2.43 * ppm);
+  // floor
+  ctx.fillStyle = '#5b5f66'; ctx.fillRect(SX(L), SY(0), (R - L) * ppm, 0.12 * ppm);
+  ctx.fillStyle = '#f3c623'; ctx.fillRect(SX(dx0), SY(0.02), (dx1 - dx0) * ppm, 0.04 * ppm);
+  ctx.fillStyle = '#3d4047'; ctx.fillRect(SX(L), SY(-0.12), (R - L) * ppm, 0.6 * ppm);
+  // passengers
+  drawPerson(npcs[0].x, npcs[0].th, { shirt: npcs[0].shirt, hair: npcs[0].hair, strapHand: !npcs[0].fall, stress: npcs[0].fall ? 1 : 0, pants: '#4a4036' });
+  drawPerson(npcs[1].x, npcs[1].th, { shirt: npcs[1].shirt, hair: npcs[1].hair, poleHand: npcs[1].fall ? null : -0.4, stress: npcs[1].fall ? 1 : 0 });
+  drawPerson(0, th, { shirt: '#f2f0ea', hair: '#2a1d14', pack: '#e3602f', phone: true, stress: st === 'play' ? Math.abs(th) / P.FAIL : 1 });
+  // danger vignette
+  const dz = st === 'play' ? clamp((Math.abs(th) / P.FAIL - 0.6) / 0.4, 0, 1) : 0;
+  ctx.restore();
+  if (dz > 0) {
+    const gx = th > 0 ? W : 0, g = ctx.createRadialGradient(gx, H / 2, 0, gx, H / 2, W * 0.8);
+    g.addColorStop(0, `rgba(229,72,58,${0.45 * dz})`); g.addColorStop(1, 'rgba(229,72,58,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+}
+
+// ---- loop ----
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const n = Math.max(1, Math.ceil(dt * 120));
+  for (let i = 0; i < n; i++) simulate(dt / n);
+  frameUI(dt); render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>

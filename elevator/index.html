@@ -97,6 +97,7 @@
     display: flex; align-items: center; justify-content: center; padding: 20px;
   }
   #overlay.hidden { display: none; }
+  #overlay .home { display: inline-block; margin-top: 14px; color: inherit; opacity: .75; font-size: 14px; }
   .card { max-width: 420px; width: 100%; text-align: center; }
   .card h1 { font-size: 26px; margin: 0 0 6px; }
   .card h2 { font-size: 30px; margin: 0 0 8px; }
@@ -398,6 +399,7 @@
       <h1>🛗 닫힘 버튼 연타</h1>
       <p>엘리베이터에 나 혼자. 저 멀리서 누가 뛰어온다.<br>오기 전에 문을 닫아라!</p>
       <div class="modes">${item('fixed')}${item('random')}</div>
+      <a class="home" href="../index.html">← 게임 목록</a>
     </div>`;
     overlay.classList.remove('hidden');
   }

@@ -1,28 +1,119 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>MiniGame</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>동네 오락실</title>
+<meta name="description" content="한 판에 1분, 일상 속 소동을 버티는 작은 브라우저 게임 모음">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
 <style>
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #1b1d21; color: #f2f2f2;
-         font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
-  main { width: min(420px, 90vw); }
-  h1 { margin: 0 0 16px; }
-  a.game { display: block; padding: 16px; border-radius: 12px; background: #262a30; border: 2px solid #3d434b;
-           color: inherit; text-decoration: none; margin-bottom: 12px; }
-  a.game:hover { border-color: #ffcc33; }
-  a.game b { font-size: 18px; }
-  a.game span { display: block; font-size: 14px; opacity: .75; margin-top: 4px; }
+/* Layout: sticker-sheet arcade. Marquee header, then a grid of game cards that look like stickers peeled onto a mint board */
+:root {
+  --board: #d9f3e8;
+  --board-dot: #bfe8d6;
+  --ink: #23263a;
+  --paper: #ffffff;
+  --tomato: #ff6b57;
+  --sun: #ffd23f;
+  --muted: #5d6478;
+  --display: "Jua", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "Gowun Dodum", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--board); }
+body {
+  margin: 0; min-height: 100vh; color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5;
+  background: var(--board) radial-gradient(var(--board-dot) 1.5px, transparent 1.6px) 0 0 / 22px 22px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: grid; gap: 10px; justify-items: start; margin-bottom: 28px; }
+.marquee { font-family: var(--display); font-weight: 400; margin: 0; font-size: clamp(40px, 9vw, 72px); line-height: 1;
+  background: var(--ink); color: var(--sun); padding: 10px 22px 12px; border-radius: 22px; transform: rotate(-1.5deg);
+  box-shadow: 6px 6px 0 var(--tomato); text-wrap: balance; }
+.marquee span { color: var(--paper); }
+.tag { margin: 6px 0 0; font-size: 16px; color: var(--muted); max-width: 52ch; }
+.count { font-family: var(--display); font-size: 15px; background: var(--paper); border: 2px solid var(--ink); border-radius: 999px; padding: 3px 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 22px; }
+.card { position: relative; display: grid; grid-template-rows: auto 1fr; background: var(--paper); color: inherit; text-decoration: none;
+  border: 3px solid var(--ink); border-radius: 22px; overflow: hidden; box-shadow: 5px 5px 0 var(--ink);
+  transition: transform .15s ease, box-shadow .15s ease; min-width: 0; }
+.card:hover { transform: translate(-2px, -3px) rotate(-.4deg); box-shadow: 8px 9px 0 var(--ink); }
+.card:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+.card:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
+.thumb { position: relative; aspect-ratio: 16 / 10; max-width: 100%; border-bottom: 3px solid var(--ink); background: var(--c, #ccc); }
+.thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.new { position: absolute; top: 10px; right: 10px; font-family: var(--display); font-size: 15px; background: var(--sun); color: var(--ink);
+  border: 2px solid var(--ink); border-radius: 999px; padding: 2px 10px; transform: rotate(6deg); }
+.body { display: grid; align-content: start; gap: 8px; padding: 14px 16px 16px; min-width: 0; }
+.body h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 25px; line-height: 1.15; display: flex; align-items: center; gap: 8px; text-wrap: balance; }
+.body h2::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--c); border: 2px solid var(--ink); flex: none; }
+.desc { margin: 0; color: var(--muted); }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+.chip { font-size: 12px; border: 1.5px solid var(--ink); border-radius: 999px; padding: 1px 9px; background: var(--board); }
+.best { margin-left: auto; font-family: var(--display); font-size: 14px; font-variant-numeric: tabular-nums; color: var(--tomato); }
+.play { margin-top: 6px; font-family: var(--display); font-size: 18px; background: var(--ink); color: var(--sun); border-radius: 999px; padding: 8px 14px; justify-self: start; }
+.soon { display: grid; place-content: center; text-align: center; gap: 6px; min-height: 220px; border: 3px dashed var(--ink); border-radius: 22px;
+  color: var(--muted); background: rgba(255,255,255,.45); font-size: 14px; padding: 20px; }
+.soon b { font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--ink); }
+footer { margin-top: 36px; font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .card, .card:hover, .card:active { transition: none; transform: none; } }
 </style>
 </head>
 <body>
-<main>
-  <h1>🎮 MiniGame</h1>
-  <a class="game" href="elevator/">
-    <b>🛗 닫힘 버튼 연타</b>
-    <span>누가 타기 전에 엘리베이터 문을 닫아라!</span>
-  </a>
-</main>
+<div class="wrap">
+  <header>
+    <h1 class="marquee">동네 <span>오락실</span></h1>
+    <p class="tag">한 판에 1분. 엘리베이터, 버스, 배, 동네 곳곳에서 벌어지는 소동을 버티는 작은 게임들이에요.</p>
+    <span class="count" id="count">게임 0개</span>
+  </header>
+  <main class="grid" id="grid" aria-label="게임 목록"></main>
+  <footer>최고 기록은 이 기기의 브라우저에만 저장됩니다. 새 게임은 계속 추가돼요.</footer>
+</div>
+<script src="games.js"></script>
+<script>
+(() => {
+  const games = (window.GAMES || []).slice().sort((a, b) => b.added.localeCompare(a.added));
+  const grid = document.getElementById('grid');
+  document.getElementById('count').textContent = `게임 ${games.length}개`;
+  const newest = games.length ? games[0].added : '';
+  const fmtBest = (b) => {
+    let v = null;
+    try { v = localStorage.getItem(b.key); } catch (e) {}
+    if (v === null || v === '' || isNaN(+v) || +v <= 0) return '';
+    const n = +v, label = b.label || '최고';
+    if (b.decimals != null) return `${label} ${n.toFixed(b.decimals)}${b.unit}`;
+    return label + ' ' + (b.unit === 'm' ? (n < 10 ? n.toFixed(1) : Math.round(n)) + 'm' : n + b.unit);
+  };
+  for (const g of games) {
+    const a = document.createElement('a');
+    a.className = 'card'; a.href = `${g.id}/index.html`; a.style.setProperty('--c', g.color);
+    a.innerHTML = `
+      <div class="thumb"><img src="thumbs/${g.id}.jpg" alt="" loading="lazy"></div>
+      <div class="body">
+        <h2></h2>
+        <p class="desc"></p>
+        <div class="meta"></div>
+        <span class="play">플레이 ▶</span>
+      </div>`;
+    a.querySelector('h2').textContent = g.title;
+    a.querySelector('.desc').textContent = g.desc;
+    const meta = a.querySelector('.meta');
+    for (const c of g.controls) { const s = document.createElement('span'); s.className = 'chip'; s.textContent = c; meta.appendChild(s); }
+    const best = g.best ? fmtBest(g.best) : '';
+    if (best) { const s = document.createElement('span'); s.className = 'best'; s.textContent = best; meta.appendChild(s); }
+    if (g.added === newest) { const s = document.createElement('span'); s.className = 'new'; s.textContent = 'NEW'; a.querySelector('.thumb').appendChild(s); }
+    a.setAttribute('aria-label', `${g.title} 플레이`);
+    grid.appendChild(a);
+  }
+  const soon = document.createElement('div');
+  soon.className = 'soon';
+  soon.innerHTML = '<b>다음 게임 준비 중</b><span>곧 새 소동이 들어옵니다.</span>';
+  grid.appendChild(soon);
+})();
+</script>
 </body>
 </html>
