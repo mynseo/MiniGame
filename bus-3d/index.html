@@ -39,6 +39,14 @@ body { background: var(--night); color: var(--paper); font-family: var(--body);
 #stops { font-family: var(--sign); font-size: clamp(22px, 6vw, 30px); text-shadow: 0 2px 0 rgba(0,0,0,.4); }
 #stops small { font-family: var(--body); font-size: 13px; opacity: .85; margin-left: 6px; }
 #meters { display: flex; gap: 12px; font-size: 14px; }
+#sig { display: flex; align-items: center; gap: 5px; background: #0b0b0d; border: 2px solid #2b2b30; border-radius: 999px; padding: 4px 10px 4px 6px; }
+#sig i { width: 18px; height: 18px; border-radius: 50%; background: #34363c; transition: background .15s, box-shadow .15s; }
+#sig i.r { background: #ff4a3a; box-shadow: 0 0 10px #ff4a3a; }
+#sig i.y { background: #ffcc1a; box-shadow: 0 0 10px #ffcc1a; }
+#sig i.g { background: #3ddc6a; box-shadow: 0 0 10px #3ddc6a; }
+#sig span { font-family: var(--sign); font-size: 16px; min-width: 4.2em; text-align: right; font-variant-numeric: tabular-nums; }
+#sig.far { opacity: .45; }
+.ic.light { width: 24px; height: 24px; }
 #meters b { font-family: var(--sign); font-weight: 400; font-size: 20px; }
 #route { font-size: 12px; background: var(--pole); color: #1a1a1a; border-radius: 3px; padding: 2px 7px; font-weight: 700; }
 #ahead { position: relative; height: 30px; background: rgba(11,11,13,.72); border-radius: 15px; overflow: hidden; }
@@ -104,6 +112,7 @@ body { background: var(--night); color: var(--paper); font-family: var(--body);
     <div id="led">다음 정류장 ▶ 은행나무사거리</div>
     <div id="stats">
       <div id="stops">0<small>정류장 버팀</small></div>
+      <div id="sig" aria-label="다음 신호"><i></i><i></i><i></i><span id="sigd">신호 없음</span></div>
       <div id="meters"><span><b id="kmh">0</b> km/h</span><span><b id="gee">0.00</b> G</span><span id="route">마을</span></div>
     </div>
     <div id="ahead"><div class="ic bus">▶</div><span class="lbl">150m</span></div>
@@ -157,10 +166,10 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // body = inverted pendulum on the feet. +theta = leaning toward the bus front (right side of screen).
 const P = { K_LEG: 15, GRAV: 9, INERTIA: 1.25, DAMP: 2.4, PUSH: 7, FAIL: 0.85 };
 const STAGES = [
-  { name: '마을', label: '마을버스', color: '#5cc46a', vmax: 11, go: 1.6, brake: 2.0, jerk: 5, red: 0.5, cat: 0, noise: 0.25 },
-  { name: '간선', label: '간선버스', color: '#5b9bf0', vmax: 13.5, go: 2.4, brake: 2.8, jerk: 8, red: 0.6, cat: 1 / 30, noise: 0.35 },
-  { name: '광역', label: '광역버스', color: '#f0705f', vmax: 16, go: 3.2, brake: 3.8, jerk: 12, red: 0.7, cat: 1 / 20, noise: 0.45 },
-  { name: '심야', label: '심야버스', color: '#6a6fd0', vmax: 17, go: 3.8, brake: 4.8, jerk: 18, red: 0.75, cat: 1 / 14, noise: 0.6 }
+  { name: '마을', label: '마을버스', color: '#5cc46a', vmax: 11, go: 1.6, brake: 2.0, jerk: 5, red: 0.8, cat: 0, noise: 0.25 },
+  { name: '간선', label: '간선버스', color: '#5b9bf0', vmax: 13.5, go: 2.4, brake: 2.8, jerk: 8, red: 0.85, cat: 1 / 30, noise: 0.35 },
+  { name: '광역', label: '광역버스', color: '#f0705f', vmax: 16, go: 3.2, brake: 3.8, jerk: 12, red: 0.9, cat: 1 / 20, noise: 0.45 },
+  { name: '심야', label: '심야버스', color: '#6a6fd0', vmax: 17, go: 3.8, brake: 4.8, jerk: 18, red: 0.9, cat: 1 / 14, noise: 0.6 }
 ];
 const stageOf = n => n < 2 ? 0 : n < 5 ? 1 : n < 9 ? 2 : 3;
 const STOP_NAMES = ['은행나무사거리', '시장입구', '구청앞', '한빛도서관', '중앙병원', '버들마을', '소방서', '체육공원',
@@ -196,8 +205,8 @@ function reset() {
   planSegment(); planSegment();
 }
 function planSegment() {
-  const start = segEnd, end = start + (segEnd === 0 ? 120 : rand(150, 210));
-  const n = segEnd === 0 ? 1 : 1 + (Math.random() < 0.5 ? 1 : 0);
+  const start = segEnd, end = start + (segEnd === 0 ? 90 : rand(100, 150));
+  const n = segEnd === 0 ? 1 : 2;
   for (let k = 1; k <= n; k++) objs.push({ type: 'light', x: start + (end - start) * k / (n + 1) + rand(-12, 12), color: 'green', willStop: null, t: 0, wait: 0 });
   if (segEnd > 0 && Math.random() < 0.55) objs.push({ type: 'bump', x: start + rand(30, end - start - 30), hit: 0 });
   objs.push({ type: 'stop', x: end, name: STOP_NAMES[stopIdx++ % STOP_NAMES.length], done: false, wait: 0 });
@@ -373,10 +382,10 @@ function simulate(dt) {
         const need = v * v / (2 * Math.max(d - 1, 0.5));
         if (need < 5.5) { o.color = 'yellow'; o.t = 0; } else o.willStop = false;
       } else if (o.color === 'yellow') { o.t += dt; if (o.t > 1.1) o.color = 'red'; }
-      else if (o.color === 'red' && o.wait > (o.hold || (o.hold = rand(1.8, 3.2)))) { o.color = 'green'; o.willStop = false; o.braking = false; }
+      else if (o.color === 'red' && o.wait > (o.hold || (o.hold = rand(1.2, 2.2)))) { o.color = 'green'; o.willStop = false; o.braking = false; }
     } else if (o.type === 'stop' && !o.done && o.wait > 0) {
       if (doorOpen === 0 && o.wait > 0.3) { doorOpen = 0.001; sfx.door(); sfx.bell(); }
-      if (o.wait > 3.2) {
+      if (o.wait > 2.4) {
         o.done = true; o.braking = false;
         if (st === 'play') { stops++; sfx.ding(); pop(`${o.name} · ${stops}번째`); }
         const ns = stageOf(stops);
@@ -490,6 +499,14 @@ function frameUI(dt) {
     if (o.type === 'light') { e.style.background = o.color === 'green' ? '#3cc65a' : o.color === 'yellow' ? '#f5c518' : '#e5483a'; e.textContent = ''; }
     else e.textContent = o.type === 'stop' ? '정' : o.type === 'cat' ? '!' : '';
   });
+  // next traffic light, big and readable
+  const nl = objs.find(o => o.type === 'light' && o.x - busX > -1.5 && o.x - busX < 150);
+  const lamps = $('sig').children;
+  const on = nl ? (nl.color === 'red' ? 'r' : nl.color === 'yellow' ? 'y' : 'g') : '';
+  ['r', 'y', 'g'].forEach((k, i) => { const c = k === on ? k : ''; if (lamps[i].className !== c) lamps[i].className = c; });
+  const sd = nl ? (nl.x - busX < 3 ? (nl.color === 'green' ? '통과' : '정지') : Math.round(nl.x - busX) + 'm') : '신호 없음';
+  if ($('sigd').textContent !== sd) $('sigd').textContent = sd;
+  $('sig').classList.toggle('far', !nl);
   // LED sign
   alertT = Math.max(0, alertT - dt);
   const next = objs.find(o => o.type === 'stop' && !o.done && o.x - busX > -1);
@@ -735,11 +752,15 @@ function makeObjMesh(o) {
     box(0.4, 0.02, 3.6, 0xf5f3ee, 0, ROAD_Y + 0.012, 0.3, g, false); // stop line
     cyl(0.09, 5.4, 0x30343b, 3, ROAD_Y + 2.7, 2.9, g);
     box(0.12, 0.12, 3.2, 0x30343b, 3, ROAD_Y + 5.3, 1.35, g);
-    box(0.3, 0.36, 1.15, 0x23262c, 3, ROAD_Y + 5.05, 0.2, g);
+    box(0.34, 0.55, 1.5, 0x23262c, 3, ROAD_Y + 5.05, 0.2, g);
+    box(0.34, 1.45, 0.55, 0x23262c, 2.95, ROAD_Y + 2.85, 2.9, g); // post-mounted head, seen through the windows
     g.userData.lamps = [0xe5483a, 0xf5c518, 0x3cc65a].map((c, i) => {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshBasicMaterial({ color: 0x3b3e44 }));
-      m.position.set(2.84, ROAD_Y + 5.05, 0.58 - i * 0.38); g.add(m); m.userData.on = c; return m;
-    });
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 10), new THREE.MeshBasicMaterial({ color: 0x3b3e44 }));
+      m.position.set(2.8, ROAD_Y + 5.05, 0.68 - i * 0.48); g.add(m); m.userData.on = c; return m;
+    }).concat([0xe5483a, 0xf5c518, 0x3cc65a].map((c, i) => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 10), new THREE.MeshBasicMaterial({ color: 0x3b3e44 }));
+      m.position.set(2.75, ROAD_Y + 3.3 - i * 0.45, 2.9); g.add(m); m.userData.on = c; return m;
+    }));
   } else if (o.type === 'stop') {
     const gx = -7.4;
     for (const dx of [-1.3, 1.3]) cyl(0.05, 2.5, 0x6d737c, gx + dx, ROAD_Y + 1.4, 4.4, g);
@@ -774,7 +795,7 @@ function syncObjects(dt) {
     o.mesh.position.x = o.x - busX + FRONT_X;
     if (o.type === 'light') {
       const on = o.color === 'red' ? 0 : o.color === 'yellow' ? 1 : 2;
-      o.mesh.userData.lamps.forEach((m, i) => m.material.color.setHex(i === on ? m.userData.on : 0x3b3e44));
+      o.mesh.userData.lamps.forEach((m, i) => m.material.color.setHex(i % 3 === on ? m.userData.on : 0x3b3e44));
     } else if (o.type === 'cat') {
       const c = o.mesh.userData.cat;
       c.position.z -= dt * (o.gone ? 3.2 : 1.6);
@@ -834,6 +855,14 @@ function updateCans(dt) {
 
 // ---- pose & camera ----
 let camT = new THREE.Vector3(1.2, 1.0, 0.2), camLag = 0, shownStage = -1, ledText = '';
+// bracing: the closer to falling, the deeper the knees bend and the hips sink (no arm waving)
+function brace(p, amount, dt) {
+  p._sq = (p._sq || 0) + (amount - (p._sq || 0)) * Math.min(1, dt * 8);
+  const k = 0.08 + p._sq * 0.85;                // thigh angle (rad); a little give even when calm
+  p.leg(0, k, k * 2); p.leg(1, k, k * 2);       // knees forward, shins back: feet stay under the hips
+  p.body.position.y = -(0.43 + 0.42) * (1 - Math.cos(k));
+  p.upper.rotation.x = k * 0.55;                // lean the chest forward a little to keep balance
+}
 function poseArms(p, mode, stress) {
   if (mode === 'phone') { p.arm('L', 0.05, 0.1, 0.2); p.arm('R', 0.55, 0.05, 1.5); }
   else if (mode === 'strap') { p.arm('L', 0.05, 0.1, 0.15); p.arm('R', 2.95, 0.12, 0.08); }
@@ -863,7 +892,11 @@ function render(dt) {
   const stressP = st === 'play' ? Math.abs(th) / P.FAIL : 1;
   for (const pp of people) pp.update(t);
   player.root.rotation.z = -th; poseArms(player, 'phone', stressP);
-  npcMesh.forEach((m, i) => { m.root.rotation.z = -npcs[i].th; poseArms(m, i === 0 ? 'strap' : 'pole', npcs[i].fall ? 1 : 0); });
+  brace(player, st === 'play' ? clamp((stressP - 0.1) / 0.5, 0, 1) : 0.4, dt);
+  npcMesh.forEach((m, i) => {
+    m.root.rotation.z = -npcs[i].th; poseArms(m, i === 0 ? 'strap' : 'pole', npcs[i].fall ? 1 : 0);
+    brace(m, npcs[i].fall ? 0.4 : clamp(Math.abs(npcs[i].th) * 3 + Math.abs(a) * 0.06, 0, 0.8), dt);
+  });
   // street
   dashes(busX); tPool(busX);
   bPool(busX);
