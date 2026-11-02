@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>닫힘 버튼 연타 — 엘리베이터 문 빨리 닫기</title>
 <style>
   :root { --accent: #ffcc33; --bad: #ff5a5a; --good: #4cd38a; }
@@ -23,6 +23,32 @@
   #hud .stat b { font-size: 20px; color: var(--accent); }
   #view { position: relative; flex: 1; min-height: 0; }
   #view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  /* 모바일: 화면 맨 아래 열림·닫힘 버튼 */
+  #pad {
+    display: none; flex: none; gap: 32px; justify-content: center; align-items: center; z-index: 5;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    background: linear-gradient(#2b2f35, #1c1f24); border-top: 2px solid #3d434b;
+  }
+  body.mobile #pad { display: flex; }
+  .pbtn {
+    width: 96px; height: 96px; border-radius: 50%; border: 4px solid #9aa1a8; padding: 0;
+    background: radial-gradient(circle at 40% 35%, #fff, #b8bfc6); color: #222; cursor: pointer;
+    font: inherit; font-size: 30px; font-weight: 900; letter-spacing: -4px; line-height: 1;
+    display: grid; place-items: center; align-content: center; gap: 4px;
+    box-shadow: 0 4px 0 #5f666d; touch-action: manipulation; transition: transform 50ms, box-shadow 50ms;
+  }
+  .pbtn small { font-size: 14px; letter-spacing: 0; font-weight: 800; }
+  .pbtn.open { color: #2c5ea8; }
+  .pbtn.on { transform: translateY(3px) scale(.95); box-shadow: 0 0 24px var(--accent); border-color: var(--accent); }
+
+  /* 닫힘을 누를 때마다 번쩍이는 화면 테두리와 튀어나오는 숫자. 문이 닫힐수록 커진다 */
+  #flash { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+  #combo {
+    position: absolute; left: 50%; top: 42%; z-index: 4; pointer-events: none; opacity: 0;
+    transform: translate(-50%, -50%); font-size: 14vmin; font-weight: 900; color: var(--accent);
+    -webkit-text-stroke: 2px #1a1a1a; text-shadow: 0 4px 16px rgba(0,0,0,.6); font-variant-numeric: tabular-nums;
+  }
 
   #bubble {
     position: absolute; z-index: 3; transform: translate(-50%, -100%); pointer-events: none;
@@ -84,6 +110,12 @@
   <div id="view">
     <div id="loading">불러오는 중…</div>
     <div id="bubble"></div>
+    <div id="flash"></div>
+    <div id="combo"></div>
+  </div>
+  <div id="pad">
+    <button class="pbtn open" data-kind="open" aria-label="열림">◀▶<small>열림</small></button>
+    <button class="pbtn close" data-kind="close" aria-label="닫힘">▶◀<small>닫힘</small></button>
   </div>
   <div id="countdown"></div>
   <div id="overlay" class="hidden"></div>
@@ -98,7 +130,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 // 모드별: 닫힘을 몇 번 눌러야 문이 다 닫히는지, 상대가 문 앞까지 오는 데 걸리는 시간(초)
 const MODES = {
   fixed:  { name: '고정 버튼', taps: 30, arrive: 6.0, desc: '닫힘 버튼은 제자리. 손가락이 허락하는 한 최대한 빠르게 연타!' },
-  random: { name: '랜덤 버튼', taps: 15, arrive: 7.5, desc: '누를 때마다 닫힘 버튼이 엘리베이터 안 어딘가로 순간이동. 같이 움직이는 열림 버튼은 누르면 문이 다시 열려요!' },
+  swap:   { name: '랜덤 버튼', taps: 20, arrive: 7.0, desc: '누를 때마다 열림·닫힘 버튼이 서로 자리를 바꿀 수도 있어요. 잘못 눌러 열림이 눌리면 문이 다시 열려요!' },
 };
 const OPEN_PENALTY = 3; // 열림 버튼을 잘못 누르면 되돌아가는 닫힘 횟수
 
@@ -414,10 +446,11 @@ for (let i = 0; i < 6; i++) {
   scene.add(b);
 }
 const FRONT = new THREE.Vector3(0, 0, 1);
-const FIXED = {
-  open: new THREE.Vector3(panelX - 0.08, 1.04, 0.013),
-  close: new THREE.Vector3(panelX + 0.08, 1.04, 0.013),
-};
+// 조작반의 두 자리. 기본은 왼쪽 열림, 오른쪽 닫힘이고 랜덤 버튼 모드에서는 둘이 자리를 바꾼다
+const SLOT_L = new THREE.Vector3(panelX - 0.08, 1.04, 0.013);
+const SLOT_R = new THREE.Vector3(panelX + 0.08, 1.04, 0.013);
+const padOpen = document.querySelector('.pbtn.open'), padClose = document.querySelector('.pbtn.close');
+let swapped = false;
 
 function attach(btn, point, normal) {
   btn.position.copy(point);
@@ -425,61 +458,30 @@ function attach(btn, point, normal) {
   // 다음 프레임을 그리기 전에 들어온 탭도 새 위치로 판정하게 바로 갱신한다
   btn.updateMatrixWorld(true);
 }
-function dockButtons() {
-  attach(openBtn, FIXED.open, FRONT);
-  attach(closeBtn, FIXED.close, FRONT);
+function placeButtons() {
+  attach(openBtn, swapped ? SLOT_R : SLOT_L, FRONT);
+  attach(closeBtn, swapped ? SLOT_L : SLOT_R, FRONT);
+  padOpen.style.order = swapped ? 2 : 1;
+  padClose.style.order = swapped ? 1 : 2;
+}
+/** 랜덤 버튼 모드: 누를 때마다 반반 확률로 두 버튼이 자리를 바꾼다 */
+function maybeSwap() {
+  if (modeKey !== 'swap') return;
+  swapped = Math.random() < 0.5;
+  placeButtons();
 }
 
-// 랜덤 모드에서 버튼이 붙을 수 있는 면: 양옆 벽, 앞벽 기둥, 천장, 바닥 (u·v는 0~1)
-const SURFACES = [
-  { n: [1, 0, 0],  side: [0, 0, 1], at: (u, v) => [-CAR_W / 2, 1.05 + u * 1.0, 0.15 + v * 1.2] },
-  { n: [-1, 0, 0], side: [0, 0, 1], at: (u, v) => [CAR_W / 2, 1.05 + u * 1.0, 0.15 + v * 1.2] },
-  { n: [0, 0, 1],  side: [1, 0, 0], at: (u, v) => [-(DOOR_W / 2 + 0.09 + u * (pillarW - 0.18)), 0.35 + v * 1.7, 0] },
-  // 오른쪽 기둥은 조작반 위아래만
-  { n: [0, 0, 1],  side: [1, 0, 0], at: (u, v) => [DOOR_W / 2 + 0.09 + u * (pillarW - 0.18), v < 0.5 ? 0.3 + v * 1.1 : 1.62 + (v - 0.5) * 0.8, 0] },
-  { n: [0, -1, 0], side: [1, 0, 0], at: (u, v) => [-0.65 + u * 1.3, CAR_H - 0.012, 0.15 + v * 0.95] },
-  { n: [0, 1, 0],  side: [1, 0, 0], at: (u, v) => [-0.65 + u * 1.3, 0.0, 0.2 + v * 0.7] },
-];
 const tmpV = new THREE.Vector3(), tmpW = new THREE.Vector3();
 function toScreen(p, out = new THREE.Vector2()) {
   tmpV.copy(p).project(camera);
   return out.set((tmpV.x + 1) / 2 * view.clientWidth, (1 - tmpV.y) / 2 * view.clientHeight);
 }
-/** 화면 안에 충분히 크게 보이고, 피해야 할 화면 위치들과 떨어진 자리를 고른다 */
-function randomSpot(avoid) {
-  let best = null;
-  for (let i = 0; i < 80; i++) {
-    const s = SURFACES[Math.random() * SURFACES.length | 0];
-    const point = new THREE.Vector3(...s.at(Math.random(), Math.random()));
-    const normal = new THREE.Vector3(...s.n);
-    const side = new THREE.Vector3(...s.side);
-    const up = new THREE.Vector3().crossVectors(normal, side);
-    tmpV.copy(point).project(camera);
-    if (Math.abs(tmpV.x) > 0.84 || Math.abs(tmpV.y) > 0.84 || tmpV.z > 1) continue;
-    const scr = toScreen(point);
-    // 너무 비스듬하거나 멀어서 작게 보이면 누르기 어렵다
-    const px = Math.min(
-      scr.distanceTo(toScreen(tmpW.copy(point).addScaledVector(side, 0.07))),
-      scr.distanceTo(toScreen(tmpW.copy(point).addScaledVector(up, 0.07))),
-    );
-    if (px < 14) continue;
-    const d = Math.min(Infinity, ...avoid.map((a) => a.distanceTo(scr)));
-    const score = Math.min(d, 260) + px;
-    if (!best || score > best.score) best = { point, normal, scr, score };
-    if (d > 180 && px > 20) break;
-  }
-  return best;
-}
-let lastScreen = null;
-function moveButtons() {
-  const c = randomSpot(lastScreen ? [lastScreen] : []);
-  attach(closeBtn, c.point, c.normal);
-  const o = randomSpot([c.scr, ...(lastScreen ? [lastScreen] : [])]);
-  attach(openBtn, o.point, o.normal);
-  lastScreen = c.scr;
-}
 
 // ---------------------------------------------------------------- 카메라 맞추기
+// 손가락으로 하는 기기나 좁은 화면이면 화면 맨 아래에 큰 버튼을 둔다
+const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 600;
+document.body.classList.toggle('mobile', MOBILE);
+
 function resize() {
   const w = view.clientWidth, h = view.clientHeight;
   if (!w || !h) return;
@@ -524,7 +526,7 @@ const setBest = (m, v) => { try { localStorage.setItem(bestKey(m), v.toFixed(3))
 let mode = null, modeKey = null;
 let state = 'menu'; // menu | countdown | playing | win | lose | done
 let closed = 0, presses = 0, wrong = 0;
-let startAt = 0, endAt = 0, shake = 0;
+let startAt = 0, endAt = 0, shake = 0, shakeAmp = 0.02, punch = 0;
 let bubbleText = '';
 
 function setBubble(text) {
@@ -534,7 +536,7 @@ function setBubble(text) {
 }
 
 function resetScene() {
-  closed = 0; presses = 0; wrong = 0; lastScreen = null;
+  closed = 0; presses = 0; wrong = 0; swapped = false; punch = 0;
   doorShown = 0; placeDoors(0);
   floorNow = 1; drawFloor('1', false);
   person.root.position.set(0, 0, START_Z);
@@ -546,23 +548,38 @@ function resetScene() {
   needEl.textContent = mode ? ` / ${mode.taps}` : '';
 }
 
+const flash = $('flash'), combo = $('combo');
+/** 닫힘 한 번마다 화면을 강조한다. 문이 많이 닫혔을수록 테두리 빛·숫자·흔들림이 커진다 */
+function emphasize() {
+  const p = closed / mode.taps;
+  punch = 1;
+  shake = Math.max(shake, 0.08 + 0.1 * p);
+  shakeAmp = 0.004 + 0.014 * p;
+  combo.textContent = closed;
+  const sc = 0.7 + 2.3 * p;
+  combo.animate([
+    { transform: `translate(-50%, -50%) scale(${sc * 0.6})`, opacity: 1 },
+    { transform: `translate(-50%, -50%) scale(${sc})`, opacity: 0 },
+  ], { duration: 260 + 220 * p, easing: 'ease-out' });
+}
 function onClose() {
   presses++;
   closed++;
   beep(880 + closed * 12, 0.04);
   closeBtn.userData.glow = 1;
   tapsEl.textContent = closed;
+  emphasize();
   if (closed >= mode.taps) return finish('win');
-  if (modeKey === 'random') moveButtons();
+  maybeSwap();
 }
 function onOpen() {
   wrong++;
   closed = Math.max(0, closed - OPEN_PENALTY);
   buzz();
   openBtn.userData.glow = 1;
-  shake = 0.25;
+  shake = 0.25; shakeAmp = 0.02;
   tapsEl.textContent = closed;
-  if (modeKey === 'random') moveButtons();
+  maybeSwap();
 }
 
 const raycaster = new THREE.Raycaster();
@@ -577,6 +594,15 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   if (!hit) return;
   if (hit.object.userData.kind === 'close') onClose(); else onOpen();
 });
+$('pad').addEventListener('pointerdown', (e) => {
+  const b = e.target.closest('.pbtn');
+  if (!b) return;
+  e.preventDefault();
+  if (state !== 'playing') return;
+  b.classList.add('on');
+  setTimeout(() => b.classList.remove('on'), 70);
+  if (b.dataset.kind === 'close') onClose(); else onOpen();
+});
 // 연타 중에 더블탭 확대나 길게 누르기 메뉴가 뜨지 않게
 document.addEventListener('dblclick', (e) => e.preventDefault());
 document.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -586,7 +612,8 @@ function start(key) {
   mode = MODES[key];
   resetScene();
   overlay.classList.add('hidden');
-  if (key === 'random') moveButtons(); else dockButtons();
+  if (key === 'swap') swapped = Math.random() < 0.5;
+  placeButtons();
   state = 'countdown';
   audio();
   let n = 3;
@@ -607,7 +634,7 @@ function finish(result) {
   endAt = performance.now();
   timeEl.textContent = ((endAt - startAt) / 1000).toFixed(2);
   if (result === 'win') ding();
-  else { buzz(); shake = 0.35; }
+  else { buzz(); shake = 0.35; shakeAmp = 0.02; }
 }
 
 function showResult(won) {
@@ -642,7 +669,7 @@ function showMenu() {
   state = 'menu';
   mode = null; modeKey = null;
   resetScene();
-  dockButtons();
+  placeButtons();
   const item = (key, i) => {
     const m = MODES[key], b = getBest(key);
     return `<button class="mode" data-mode="${key}">
@@ -654,7 +681,7 @@ function showMenu() {
   overlay.innerHTML = `<div class="card">
     <h1>🛗 닫힘 버튼 연타</h1>
     <p>엘리베이터에 나 혼자. 저 멀리서 누가 뛰어온다.<br>오기 전에 문을 닫아라!</p>
-    <div class="modes">${item('fixed', 1)}${item('random', 2)}</div>
+    <div class="modes">${item('fixed', 1)}${item('swap', 2)}</div>
     <a class="home" href="../index.html">← 게임 목록</a>
   </div>`;
   overlay.classList.remove('hidden');
@@ -700,7 +727,7 @@ function frame(now) {
     if (u > 0.25 && u < 0.9) { if (bubbleText !== '아…') setBubble('아…'); }
     else if (u >= 0.9 && bubbleText) setBubble('');
     if (u > 0.5 && floorNow === 1) { floorNow = 2; drawFloor('2', true); }
-    if (u > 0.4 && u < 1.3) shake = Math.max(shake, 0.05);
+    if (u > 0.4 && u < 1.3) { shake = Math.max(shake, 0.05); shakeAmp = 0.02; }
     if (u > 1.5) showResult(true);
   } else if (state === 'lose') {
     // 손이 문 사이로 들어오고 → 문이 다시 열리고 → 들어와서 돌아선 뒤 → 문이 닫힌다
@@ -741,8 +768,16 @@ function frame(now) {
   camera.position.copy(EYE);
   if (shake > 0) {
     shake = Math.max(0, shake - dt);
-    camera.position.x += (Math.random() - 0.5) * 0.02;
-    camera.position.y += (Math.random() - 0.5) * 0.02;
+    camera.position.x += (Math.random() - 0.5) * shakeAmp;
+    camera.position.y += (Math.random() - 0.5) * shakeAmp;
+  }
+
+  if (punch > 0 || flash.style.boxShadow) {
+    punch = Math.max(0, punch - dt * 5);
+    const s = 0.25 + 0.75 * (mode ? Math.min(1, closed / mode.taps) : 0);
+    flash.style.boxShadow = punch > 0
+      ? `inset 0 0 ${30 + 120 * s}px ${6 + 44 * s}px rgba(255, 196, 40, ${(punch * (0.3 + 0.6 * s)).toFixed(3)})`
+      : '';
   }
 
   renderer.render(scene, camera);
