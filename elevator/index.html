@@ -318,8 +318,28 @@ await new Promise((resolve, reject) => {
   el.onerror = reject;
   document.head.appendChild(el);
 });
-const person = window.MS3D.person(window.MS3D.LOOKS.runner);
-scene.add(person.root);
+// 판마다 다른 이웃이 뛰어온다. 규칙은 같고 생김새와 대사만 다르다
+const L = window.MS3D.LOOKS;
+const CAST = [
+  { look: L.runner,  call: '잠깐만요~!',        thanks: '감사합니다^^',       sigh: '아…' },
+  { look: L.granny,  call: '아이고, 같이 가요~', thanks: '고마워요, 젊은이',   sigh: '에구…' },
+  { look: L.student, call: '잠시만요!!',        thanks: '헉헉… 감사합니다',   sigh: '아 진짜…' },
+  { look: L.office,  call: '저기요! 잠깐!',     thanks: '후… 감사합니다',     sigh: '하…' },
+  { look: L.cat,     call: '야옹~!',            thanks: '야옹^^',             sigh: '야옹…' },
+].map((c) => {
+  const p = window.MS3D.person(c.look);
+  p.root.visible = false;
+  scene.add(p.root);
+  return { ...c, p };
+});
+let who = CAST[0], person = who.p;
+function pickNeighbor() {
+  let next;
+  do next = CAST[Math.random() * CAST.length | 0]; while (next === who && CAST.length > 1);
+  who.p.root.visible = false;
+  who = next; person = who.p;
+  person.root.visible = true;
+}
 
 /** 달리기·걷기 자세. phase는 걸음 위상, stride는 보폭(0 = 서 있음), reach는 오른팔을 앞으로 뻗은 정도 */
 function posePerson(phase, stride, reach, shout) {
@@ -456,6 +476,8 @@ function beep(freq, dur = 0.05, vol = 0.15, type = 'square', delay = 0) {
   o.connect(g).connect(a.destination);
   o.start(t); o.stop(t + dur + 0.02);
 }
+const clunk = () => { beep(70, 0.22, 0.35, 'sine'); beep(140, 0.08, 0.15, 'triangle'); };
+const buzzHand = (ms) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch {} };
 const ding = () => { beep(1318, 0.5, 0.2, 'sine'); beep(1046, 0.8, 0.2, 'sine', 0.35); };
 const buzz = () => beep(110, 0.35, 0.2, 'sawtooth');
 
@@ -470,7 +492,7 @@ let mode = null, modeKey = null;
 let state = 'menu'; // menu | countdown | playing | win | lose | done
 let closed = 0, presses = 0, wrong = 0;
 let startAt = 0, endAt = 0, shake = 0, shakeAmp = 0.02, punch = 0;
-let bubbleText = '';
+let bubbleText = '', lastStep = 0;
 
 function setBubble(text) {
   bubbleText = text;
@@ -482,6 +504,8 @@ function resetScene() {
   closed = 0; presses = 0; wrong = 0; swapped = false; punch = 0;
   doorShown = 0; placeDoors(0);
   floorNow = 1; drawFloor('1', false);
+  pickNeighbor();
+  lastStep = 0;
   person.root.position.set(0, 0, START_Z);
   person.root.rotation.set(0, 0, 0);
   posePerson(0, 0, 0, false);
@@ -512,6 +536,7 @@ function onClose() {
   closeBtn.userData.glow = 1;
   tapsEl.textContent = closed;
   emphasize();
+  buzzHand(8 + 22 * closed / mode.taps);
   if (closed >= mode.taps) return finish('win');
   maybeSwap();
 }
@@ -549,6 +574,19 @@ $('pad').addEventListener('pointerdown', (e) => {
 // 연타 중에 더블탭 확대나 길게 누르기 메뉴가 뜨지 않게
 document.addEventListener('dblclick', (e) => e.preventDefault());
 document.addEventListener('contextmenu', (e) => e.preventDefault());
+// 컴퓨터: ← → 키가 왼쪽·오른쪽 버튼. 결과 화면에서는 Enter·스페이스로 바로 다시 하기
+addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  const left = e.key === 'ArrowLeft', right = e.key === 'ArrowRight';
+  if (state === 'playing' && (left || right)) {
+    e.preventDefault();
+    // 평소엔 왼쪽이 열림, 오른쪽이 닫힘. 자리가 바뀌면 반대
+    if (right !== swapped) onClose(); else onOpen();
+  } else if (state === 'done' && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault();
+    start(modeKey);
+  }
+});
 
 function start(key) {
   modeKey = key;
@@ -576,7 +614,7 @@ function finish(result) {
   state = result;
   endAt = performance.now();
   timeEl.textContent = ((endAt - startAt) / 1000).toFixed(2);
-  if (result === 'win') ding();
+  if (result === 'win') { clunk(); ding(); }
   else { buzz(); shake = 0.35; shakeAmp = 0.02; }
 }
 
@@ -624,6 +662,7 @@ function showMenu() {
   overlay.innerHTML = `<div class="card">
     <h1>🛗 닫힘 버튼 연타</h1>
     <p>엘리베이터에 나 혼자. 저 멀리서 누가 뛰어온다.<br>오기 전에 문을 닫아라!</p>
+    ${MOBILE ? '' : '<p style="font-size:13px;opacity:.7">버튼을 클릭하거나 ← → 키로 왼쪽·오른쪽 버튼을 누르세요.</p>'}
     <div class="modes">${item('fixed', 1)}${item('swap', 2)}</div>
     <a class="home" href="../index.html">← 게임 목록</a>
   </div>`;
@@ -662,12 +701,15 @@ function frame(now) {
     person.root.position.z = THREE.MathUtils.lerp(START_Z, ARRIVE_Z, t);
     const reach = THREE.MathUtils.clamp((t - 0.82) / 0.18, 0, 1);
     posePerson(el * 11, 1 - reach * 0.6, reach, t > 0.35);
-    if (t > 0.35 && !bubbleText) setBubble('잠깐만요~!');
+    if (t > 0.35 && !bubbleText) setBubble(who.call);
+    // 발소리: 가까워질수록 크게
+    const step = Math.floor(el * 11 / Math.PI);
+    if (step !== lastStep) { lastStep = step; beep(95 + (step % 2) * 14, 0.05, 0.03 + 0.22 * t * t, 'triangle'); }
     if (t >= 1) finish('lose');
   } else if (state === 'win') {
     // 문이 닫히고 엘리베이터가 출발한다
     doorTarget = 1;
-    if (u > 0.25 && u < 0.9) { if (bubbleText !== '아…') setBubble('아…'); }
+    if (u > 0.25 && u < 0.9) { if (bubbleText !== who.sigh) setBubble(who.sigh); }
     else if (u >= 0.9 && bubbleText) setBubble('');
     if (u > 0.5 && floorNow === 1) { floorNow = 2; drawFloor('2', true); }
     if (u > 0.4 && u < 1.3) { shake = Math.max(shake, 0.05); shakeAmp = 0.02; }
@@ -679,7 +721,7 @@ function frame(now) {
       doorTarget = u < 0.2 ? Math.min(doorTarget, 0.6) : 0;
     } else if (u < 1.6) {
       doorTarget = 0;
-      if (bubbleText !== '감사합니다^^') setBubble('감사합니다^^');
+      if (bubbleText !== who.thanks) setBubble(who.thanks);
       const w = ease((u - 0.5) / 1.1);
       person.root.position.z = THREE.MathUtils.lerp(ARRIVE_Z, 0.45, w);
       posePerson(u * 7, 0.5 * (1 - w), 0, false);

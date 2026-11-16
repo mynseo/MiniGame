@@ -98,6 +98,14 @@ body { background: var(--night); color: var(--paper); font-family: var(--body);
 #lean { position: absolute; top: 50%; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: var(--paper);
   transform: translateY(-50%); box-shadow: 0 0 0 3px rgba(0,0,0,.35); }
 #input { position: absolute; bottom: -9px; width: 0; height: 0; margin-left: -6px; border: 6px solid transparent; border-bottom-color: var(--pole); }
+.side { position: fixed; top: 50%; transform: translateY(-50%); z-index: 2; pointer-events: none; font-size: 64px; line-height: 1;
+  color: var(--paper); opacity: 0; transition: opacity .12s; text-shadow: 0 4px 14px rgba(0,0,0,.6); }
+#sideL { left: 10px; } #sideR { right: 10px; }
+.side.dim { opacity: .28; }
+.side.on { opacity: .95; color: var(--pole); }
+.side.go { opacity: 1; color: var(--danger); animation: sidepulse .32s ease-in-out infinite alternate; }
+@keyframes sidepulse { to { transform: translateY(-50%) scale(1.35); } }
+@media (prefers-reduced-motion: reduce) { .side.go { animation: none; } }
 #legend { display: flex; justify-content: space-between; font-size: 12px; opacity: .8; }
 #mute { pointer-events: auto; font: inherit; font-size: 12px; color: var(--paper); background: var(--panel);
   border: 1px solid rgba(245,243,238,.25); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
@@ -109,13 +117,15 @@ body { background: var(--night); color: var(--paper); font-family: var(--body);
 <body>
 <canvas id="c" aria-label="급정거 버스 3D 게임 화면"></canvas>
 <div id="vig"></div>
+<div class="side" id="sideL" aria-hidden="true">◀</div>
+<div class="side" id="sideR" aria-hidden="true">▶</div>
 <div id="ui">
   <div id="top">
     <div id="led">다음 정류장 ▶ 은행나무사거리</div>
     <div id="stats">
       <div id="stops">0<small>정류장 버팀</small></div>
       <div id="sig" aria-label="다음 신호"><i></i><i></i><i></i><span id="sigd">신호 없음</span></div>
-      <div id="meters"><span><b id="kmh">0</b> km/h</span><span><b id="gee">0.00</b> G</span><span id="route">마을</span></div>
+      <div id="meters"><span id="route">마을</span></div>
     </div>
     <div id="ahead"><div class="ic bus">▶</div><span class="lbl">150m</span></div>
   </div>
@@ -125,7 +135,7 @@ body { background: var(--night); color: var(--paper); font-family: var(--body);
       <p class="lead">손잡이를 놓쳤습니다. 다음 정류장까지 두 발로만 버티세요.</p>
       <ul class="rules">
         <li><b>1</b><span>버스는 화면 왼쪽으로 달립니다. 급정거하면 몸이 앞(왼쪽)으로, 급출발하면 뒤(오른쪽)로 쏠립니다.</span></li>
-        <li><b>2</b><span>쏠리는 반대쪽으로 버티세요. 너무 버티면 반대로 넘어져요.</span></li>
+        <li><b>2</b><span>쏠리는 반대쪽으로 버티세요. 위험하면 버틸 쪽 화살표가 빨갛게 뜹니다. 너무 버티면 반대로 넘어져요.</span></li>
         <li><b>3</b><span>위쪽 줄에 신호등·정류장·과속방지턱이 미리 보입니다. 고양이는 예고 없이 뛰어듭니다.</span></li>
       </ul>
       <div class="btns">
@@ -268,6 +278,7 @@ function toast(msg, ms = 4200) {
   clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, ms);
 }
 const COARSE = matchMedia('(pointer: coarse)').matches;
+const sideL = $('sideL'), sideR = $('sideR');
 const KEYS_HOW = COARSE ? '화면 왼쪽·오른쪽을 누르고 있으면 버팁니다.' : '← → 키를 누르고 있으면 버팁니다.';
 $('startTilt').addEventListener('click', async () => {
   ensureAudio();
@@ -487,8 +498,6 @@ function finish() {
 // ---- per-frame ui ----
 const aheadEl = $('ahead'), aheadPool = [];
 function frameUI(dt) {
-  $('kmh').textContent = Math.round(v * 3.6);
-  $('gee').textContent = (Math.abs(a) / 9.8).toFixed(2);
   const sTxt = String(stops);
   if ($('stops').firstChild.textContent !== sTxt) $('stops').firstChild.textContent = sTxt;
   const S = STAGES[stage]; if ($('route').textContent !== S.name) $('route').textContent = S.name;
@@ -524,6 +533,12 @@ function frameUI(dt) {
   else if (red) led(red.color === 'yellow' ? '신호 바뀝니다 · 감속' : '빨간불 · 정지합니다');
   else if (v < 1 && a > 0.1) led('출발합니다! 꽉 잡으세요');
   else led('다음 정류장 ▶ ' + (next ? next.name : ''));
+  // side arrows: red and pulsing on the side you must brace toward, yellow while you are bracing that way
+  const need = st === 'play' && Math.abs(th) > P.FAIL * 0.4 ? Math.sign(th) : 0;
+  const rest = st === 'play' && mode === 'keys' && COARSE ? 'side dim' : 'side';
+  const cl = dir => need === dir && Math.sign(u) !== dir ? 'side go' : st === 'play' && u * dir > 0.15 ? 'side on' : rest;
+  if (sideL.className !== cl(-1)) sideL.className = cl(-1);
+  if (sideR.className !== cl(1)) sideR.className = cl(1);
   // gauge
   $('lean').style.left = (50 - clamp(th / P.FAIL, -1.1, 1.1) * 38) + '%';
   $('lean').style.background = Math.abs(th) > P.FAIL * 0.7 ? 'var(--danger)' : 'var(--paper)';
