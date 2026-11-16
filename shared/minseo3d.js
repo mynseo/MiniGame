@@ -1,6 +1,6 @@
 // 민서민서김 공용 3D 부품.
 // 모든 게임의 사람·동물은 이 파일의 '멍한 떡' 캐릭터로 만든다.
-// 규칙: 목 없이 몸에 얹힌 넓적한 떡 머리 + 멀리 떨어진 짝짝이 점 눈 + 늘 살짝 벌어진 입 + 머리카락 한 가닥,
+// 규칙: 목 없이 몸에 얹힌 넓적한 떡 머리 + 멀리 떨어진 점 눈 + 늘 살짝 벌어진 입 + 머리카락 한 가닥,
 //       콩 모양 통짜 몸, 철사처럼 가는 팔다리, 벙어리장갑 손, 큼직한 신발. 무광 재질, 부드러운 그림자.
 // three.js(전역 THREE)를 먼저 불러온 뒤 <script src="../shared/minseo3d.js"> 로 쓴다.
 (function () {
@@ -84,9 +84,9 @@
     const HY = 0.16, K = HEAD_R / 0.19; // 머리 중심 높이, 얼굴 부품 배율
     const skull = mesh(head, new THREE.SphereGeometry(HEAD_R, 32, 24), skin, 0, HY, 0);
     skull.scale.set(...HEAD_S);
-    // 눈: 멀리 떨어진 점 두 개. 크기와 높이가 조금 달라서 어딘가 멍하다
+    // 눈: 멀리 떨어진 똑같은 점 두 개
     const eyeMat = MS.mat(0x1d1a26, 0.4);
-    const eyes = [[-0.118, -0.022, 0.016], [0.112, -0.008, 0.021]].map((v) => {
+    const eyes = [[-0.115, -0.015, 0.019], [0.115, -0.015, 0.019]].map((v) => {
       const [x, y, r] = v.map((n) => n * K);
       const e = mesh(head, new THREE.SphereGeometry(r, 12, 10), eyeMat, x, HY + y, onHead(x, y) - r * 0.3);
       e.castShadow = false; return e;
