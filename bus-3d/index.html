@@ -61,6 +61,7 @@ body { background: var(--night); color: var(--paper); font-family: var(--body);
 .ic.cat { background: var(--danger); color: var(--paper); animation: ledblink .3s steps(2) infinite; }
 #mid { display: grid; place-items: center; position: relative; }
 .card { pointer-events: auto; background: var(--panel); border-radius: 22px; padding: 22px; width: min(380px, 100%);
+  max-height: 100%; overflow-y: auto;
   border-top: 8px solid var(--pole); box-shadow: 0 14px 40px rgba(0,0,0,.4); }
 .card h1 { margin: 0; font-family: var(--sign); font-weight: 400; font-size: 42px; line-height: 1; text-wrap: balance; }
 .card h1 span { color: var(--led); }
@@ -71,6 +72,7 @@ body { background: var(--night); color: var(--paper); font-family: var(--body);
 .btns { display: grid; gap: 8px; margin-top: 16px; }
 .btn { font-family: var(--sign); font-size: 20px; border: 0; border-radius: 999px; padding: 12px; cursor: pointer; }
 .btn.main { background: var(--pole); color: #1a1a1a; }
+.btn small { display: block; font-family: var(--body); font-size: 12px; opacity: .75; margin-top: 2px; }
 .btn.sub { background: transparent; color: var(--paper); border: 1px solid rgba(245,243,238,.35); }
 .back { display: block; text-align: center; text-decoration: none; font-size: 16px; }
 .btn:focus-visible, #mute:focus-visible { outline: 3px solid var(--led); outline-offset: 2px; }
@@ -123,15 +125,15 @@ body { background: var(--night); color: var(--paper); font-family: var(--body);
       <p class="lead">손잡이를 놓쳤습니다. 다음 정류장까지 두 발로만 버티세요.</p>
       <ul class="rules">
         <li><b>1</b><span>버스는 화면 왼쪽으로 달립니다. 급정거하면 몸이 앞(왼쪽)으로, 급출발하면 뒤(오른쪽)로 쏠립니다.</span></li>
-        <li><b>2</b><span>폰을 쏠리는 반대쪽으로 기울여 버티세요. PC는 ← → 키를 누르고 있으면 됩니다. 너무 버티면 반대로 넘어져요.</span></li>
+        <li><b>2</b><span>쏠리는 반대쪽으로 버티세요. 너무 버티면 반대로 넘어져요.</span></li>
         <li><b>3</b><span>위쪽 줄에 신호등·정류장·과속방지턱이 미리 보입니다. 고양이는 예고 없이 뛰어듭니다.</span></li>
       </ul>
       <div class="btns">
-        <button class="btn main" id="startTilt" type="button">폰 기울여서 시작</button>
-        <button class="btn sub" id="startKeys" type="button">키보드·터치로 시작</button>
+        <button class="btn main" id="startTilt" type="button">기울기 모드<small>폰을 좌우로 기울여서 버티기</small></button>
+        <button class="btn main" id="startKeys" type="button">좌우 버튼 모드<small id="keysHow">화면 왼쪽·오른쪽을 꾹 누르기</small></button>
         <a class="btn sub back" href="../index.html">← 게임 목록</a>
       </div>
-      <p class="note" id="introNote">터치 모드: 화면 왼쪽이나 오른쪽을 누르고 있으면 그쪽으로 버팁니다.</p>
+      <p class="note" id="introNote">누르고 있는 쪽으로 버팁니다. 오래 누를수록 강하게 버팁니다.</p>
     </div>
     <div class="card" id="res" hidden>
       <div class="lab">버틴 정류장</div>
@@ -143,7 +145,7 @@ body { background: var(--night); color: var(--paper); font-family: var(--body);
         <div>최대 쏠림<b id="rg">0</b></div>
         <div id="rbest">최고<b id="rbestv">0</b></div>
       </div>
-      <div class="btns"><button class="btn main" id="again" type="button">다음 버스 타기</button><a class="btn sub back" href="../index.html">← 게임 목록</a></div>
+      <div class="btns"><button class="btn main" id="again" type="button">다음 버스 타기</button><button class="btn sub" id="chmode" type="button">모드 바꾸기</button><a class="btn sub back" href="../index.html">← 게임 목록</a></div>
     </div>
     <div id="pop"></div>
     <div id="toast" hidden></div>
@@ -265,21 +267,25 @@ function toast(msg, ms = 4200) {
   const el = $('toast'); el.textContent = msg; el.hidden = false;
   clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, ms);
 }
+const COARSE = matchMedia('(pointer: coarse)').matches;
+const KEYS_HOW = COARSE ? '화면 왼쪽·오른쪽을 누르고 있으면 버팁니다.' : '← → 키를 누르고 있으면 버팁니다.';
 $('startTilt').addEventListener('click', async () => {
   ensureAudio();
   const ok = await enableTilt();
   begin(ok ? 'tilt' : 'keys');
-  if (!ok) { toast('기울기 센서를 켤 수 없어 터치 모드로 시작했어요. 화면 왼쪽·오른쪽을 누르고 있으면 버팁니다.'); return; }
+  if (!ok) { toast('기울기 센서를 켤 수 없어 좌우 버튼 모드로 시작했어요. ' + KEYS_HOW); return; }
   setTimeout(() => {
-    if (!tiltSeen && mode === 'tilt') { mode = 'keys'; toast('기울기 센서 값이 들어오지 않아 터치 모드로 바꿨어요. 화면 왼쪽·오른쪽을 누르고 있으면 버팁니다.'); }
+    if (!tiltSeen && mode === 'tilt') { mode = 'keys'; toast('기울기 센서 값이 들어오지 않아 좌우 버튼 모드로 바꿨어요. ' + KEYS_HOW); }
   }, 1300);
 });
 $('startKeys').addEventListener('click', () => { ensureAudio(); begin('keys'); });
 $('again').addEventListener('click', () => begin(mode));
-if (!matchMedia('(pointer: coarse)').matches) {
-  $('startTilt').hidden = true;
-  $('startKeys').textContent = '시작 (← → 키)';
-  $('introNote').textContent = '← → 키 대신 A, D 키도 됩니다. 키를 꾹 누르고 있을수록 강하게 버팁니다.';
+// back to the mode choice from the result card
+$('chmode').addEventListener('click', () => { st = 'intro'; $('res').hidden = true; $('intro').hidden = false; });
+// left/right mode: touch the two halves of the screen on a phone, arrow keys on a computer
+if (!COARSE) {
+  $('keysHow').textContent = '← → 키 (또는 A, D)를 꾹 누르기';
+  $('startTilt').querySelector('small').textContent = '기울기 센서가 있는 폰·태블릿용';
 }
 
 function begin(m) {
@@ -855,13 +861,11 @@ function updateCans(dt) {
 
 // ---- pose & camera ----
 let camT = new THREE.Vector3(1.2, 1.0, 0.2), camLag = 0, shownStage = -1, ledText = '';
-// bracing: the closer to falling, the deeper the knees bend and the hips sink (no arm waving)
-function brace(p, amount, dt) {
-  p._sq = (p._sq || 0) + (amount - (p._sq || 0)) * Math.min(1, dt * 8);
-  const k = 0.08 + p._sq * 0.85;                // thigh angle (rad); a little give even when calm
-  p.leg(0, k, k * 2); p.leg(1, k, k * 2);       // knees forward, shins back: feet stay under the hips
-  p.body.position.y = -(0.43 + 0.42) * (1 - Math.cos(k));
-  p.upper.rotation.x = k * 0.55;                // lean the chest forward a little to keep balance
+// everyone stands stiff: straight legs, no crouch, whatever the bus does
+function brace(p) {
+  p.leg(0, 0, 0); p.leg(1, 0, 0);
+  p.body.position.y = 0;
+  p.upper.rotation.x = 0;
 }
 function poseArms(p, mode, stress) {
   if (mode === 'phone') { p.arm('L', 0.05, 0.1, 0.2); p.arm('R', 0.55, 0.05, 1.5); }
