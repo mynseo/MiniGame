@@ -27,11 +27,14 @@
 
 ## 3D 모델 규칙
 
-모든 게임의 사람·동물은 [`shared/minseo3d.js`](shared/minseo3d.js)의 기본 도형 캐릭터로 만듭니다 (DrumSimulator 드러머와 같은 생김새).
+모든 게임의 사람·동물은 [`shared/minseo3d.js`](shared/minseo3d.js)의 '멍한 떡' 캐릭터로 만듭니다. 단순하고, 어딘가 멍해 보이는 게 핵심입니다.
 
-- 큰 공 머리 + 바가지 머리카락 + 작은 점 눈. 코·입은 없고, 놀랄 때만 동그란 입이 열립니다.
-- 몸통·팔다리는 캡슐, 신발은 둥근 캡슐. 무광 재질에 부드러운 그림자, 영화 같은 톤(ACES).
-- 정해 둔 동네 사람 색 조합(`MS3D.LOOKS`): `me`, `drummer`, `office`, `student`, `granny`, `driver`, `runner`, `cat`.
+![동네 사람들](shared/characters.jpg)
+
+- 목 없이 몸에 얹힌 넓적한 떡 머리. 멀리 떨어진 짝짝이 점 눈, 늘 살짝 벌어진 입, 머리카락은 한 가닥. 놀라면 입과 눈이 커집니다.
+- 몸은 콩 하나(위는 윗옷 색, 아래는 바지 색), 팔다리는 철사처럼 가늘고, 손은 벙어리장갑, 신발은 큼직합니다. 뛸 때는 팔을 덜렁덜렁 흔들고 머리를 까딱입니다.
+- 무광 재질에 부드러운 그림자, 영화 같은 톤(ACES).
+- 정해 둔 동네 사람 색 조합(`MS3D.LOOKS`): `me`, `drummer`, `office`, `student`(두 가닥), `granny`(쪽머리), `driver`(모자), `runner`, `cat`(귀·수염).
 
 ```js
 const p = MS3D.person(MS3D.LOOKS.office);   // 서 있는 사람 (얼굴 +Z, 원점은 발밑)
